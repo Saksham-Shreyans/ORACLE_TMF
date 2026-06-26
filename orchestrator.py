@@ -34,6 +34,7 @@ from dataclasses import dataclass,field
 from typing import Callable,Optional
 from config.settings import LOG_FORMAT,LOG_LEVEL,WORK_DIR
 from models.mutation_artifact_graph import MutationArtifactGraph
+from security import clean_text
 from pipeline.stage_a_ingestion import APKIngestion
 from pipeline.stage_b_dex_disassembly import DEXDisassembler
 from pipeline.stage_c_manifest_parser import ManifestParser
@@ -53,6 +54,15 @@ from engines.unfinished_ui_detector import UnfinishedUIDetector
 from engines.targeting_intelligence import TargetingIntelligence
 
 logging.basicConfig(format=LOG_FORMAT,level=getattr(logging,LOG_LEVEL,logging.INFO))
+
+# Add a file handler specifically for logging errors to a file
+os.makedirs(WORK_DIR, exist_ok=True)
+error_log_path = os.path.join(WORK_DIR, "errors.log")
+error_file_handler = logging.FileHandler(error_log_path)
+error_file_handler.setLevel(logging.ERROR)
+error_file_handler.setFormatter(logging.Formatter(LOG_FORMAT))
+logging.getLogger().addHandler(error_file_handler)
+
 logger=logging.getLogger(__name__)
 @dataclass
 class AnalysisResult:
@@ -380,11 +390,11 @@ class ORACLETMFOrchestrator:
             return result
         except Exception as exc:
             elapsed=(time.perf_counter()-t0)*1000
-            mag.stage_errors[stage_name]=str(exc)
+            mag.stage_errors[stage_name]=clean_text(str(exc), 500)
             mag.stage_timings_ms[stage_name]=round(elapsed,2)
             logger.error(
                 "[Orchestrator] %s FAILED (%.0f ms): %s",
-                stage_name,elapsed,exc,
+                stage_name,elapsed,clean_text(str(exc), 500),
             )
             return default
     

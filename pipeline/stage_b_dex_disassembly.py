@@ -1,38 +1,37 @@
-"""
-ORACLE-TMF  ·  pipeline/stage_b_dex_disassembly.py
+﻿"""
+ORACLE-TMF  Â·  pipeline/stage_b_dex_disassembly.py
 ====================================================
-STAGE B — DEX Bytecode Disassembly and Smali Extraction
+STAGE B â€” DEX Bytecode Disassembly and Smali Extraction
 Responsibility:
-  • Load all .dex files (classes.dex, classes2.dex, …) from the APK
-  • Run Androguard's AnalyzeAPK to build:
-      – The Analysis object  (methods, classes, cross-references)
-      – The global Control Flow Graph (CFG) as a NetworkX DiGraph
-  • Cache the Analysis object to avoid redundant 30-90 second processing
-  • Detect and flag dynamic DEX loading (DexClassLoader) for Frida handoff
+  â€¢ Load all .dex files (classes.dex, classes2.dex, â€¦) from the APK
+  â€¢ Run Androguard's AnalyzeAPK to build:
+      â€“ The Analysis object  (methods, classes, cross-references)
+      â€“ The global Control Flow Graph (CFG) as a NetworkX DiGraph
+  â€¢ Cache the Analysis object to avoid redundant 30-90 second processing
+  â€¢ Detect and flag dynamic DEX loading (DexClassLoader) for Frida handoff
 Inputs:
-  apk_path    : str  — path to the original .apk file
-  extract_dir : str  — path produced by Stage A
+  apk_path    : str  â€” path to the original .apk file
+  extract_dir : str  â€” path produced by Stage A
 Outputs:  (analysis, cfg_graph)
   analysis    : androguard.misc.AnalyzeAPK Analysis object
-  cfg_graph   : networkx.DiGraph — method-level call graph
+  cfg_graph   : networkx.DiGraph â€” method-level call graph
 Algorithm:
   Androguard's AnalyzeAPK performs linear-sweep disassembly of Dalvik
   bytecode.  The resulting Analysis object exposes:
-    analysis.get_classes()         → all ClassAnalysis objects
-    analysis.get_method()          → all MethodAnalysis objects
-    method.get_xref_to()           → callers of this method
-    method.get_xref_from()         → callees of this method
+    analysis.get_classes()         â†’ all ClassAnalysis objects
+    analysis.get_method()          â†’ all MethodAnalysis objects
+    method.get_xref_to()           â†’ callers of this method
+    method.get_xref_from()         â†’ callees of this method
   The CFG NetworkX graph has one node per method (string descriptor)
-  and one directed edge per call (caller → callee).
+  and one directed edge per call (caller â†’ callee).
 Edge Cases:
-  • Multi-DEX APKs (classes2.dex, classes3.dex …) — all loaded
-  • Packed APKs with empty classes.dex — graceful degradation
-  • DexClassLoader detected — flag for Frida dynamic extraction
+  â€¢ Multi-DEX APKs (classes2.dex, classes3.dex â€¦) â€” all loaded
+  â€¢ Packed APKs with empty classes.dex â€” graceful degradation
+  â€¢ DexClassLoader detected â€” flag for Frida dynamic extraction
 """
 from __future__ import annotations
 import logging
 import os
-import pickle
 import time
 from pathlib import Path
 from typing import Any,Optional
@@ -60,6 +59,10 @@ class DEXDisassembler:
     def __init__(self)->None:
         if ANDROGUARD_CACHE_ENABLED:
             Path(ANDROGUARD_CACHE_DIR).mkdir(parents=True,exist_ok=True)
+            try:
+                os.chmod(ANDROGUARD_CACHE_DIR,0o700)
+            except OSError:
+                pass
     
     
     
@@ -84,12 +87,6 @@ class DEXDisassembler:
         t0=time.perf_counter()
         logger.info("[Stage B] Starting DEX disassembly: %s",apk_path)
         
-        cached=self._load_from_cache(apk_path)
-        if cached is not None:
-            analysis,cfg=cached
-            logger.info("[Stage B] Loaded from cache")
-            return analysis,cfg
-        
         analysis,apk_obj,dex_list=self._run_androguard(apk_path)
         
         cfg=self._build_cfg(analysis)
@@ -97,11 +94,10 @@ class DEXDisassembler:
         dynamic_loading=self._detect_dynamic_loading(analysis)
         if dynamic_loading:
             logger.warning(
-                "[Stage B] DexClassLoader detected — APK uses dynamic DEX loading. "
+                "[Stage B] DexClassLoader detected â€” APK uses dynamic DEX loading. "
                 "Consider Frida hook for complete analysis."
             )
         
-        self._save_to_cache(apk_path,analysis,cfg)
         elapsed_ms=(time.perf_counter()-t0)*1000
         method_count=sum(1 for _ in analysis.get_methods())
         class_count=sum(1 for _ in analysis.get_classes())
@@ -131,7 +127,7 @@ class DEXDisassembler:
                 f"Androguard AnalyzeAPK failed for {apk_path}: {exc}"
             )from exc
         if analysis is None:
-            raise DEXDisassemblyError("Androguard returned None analysis — empty or invalid DEX")
+            raise DEXDisassemblyError("Androguard returned None analysis â€” empty or invalid DEX")
         return analysis,apk_obj,dex_list
     
     
@@ -139,14 +135,14 @@ class DEXDisassembler:
     def _build_cfg(self,analysis:Any)->Optional[Any]:
         """
         Construct a directed NetworkX graph where:
-          • Each node  = method descriptor string  (class->method(signature))
-          • Each edge  = call from caller to callee
+          â€¢ Each node  = method descriptor string  (class->method(signature))
+          â€¢ Each edge  = call from caller to callee
         Node descriptor format mirrors Smali: "Lcom/example/Class;->method(Args)ReturnType"
         Performance note: For large APKs this can create 500K+ edges.
         We iterate Androguard's xref tables instead of re-parsing bytecode.
         """
         if nx is None:
-            logger.warning("[Stage B] NetworkX not available — CFG will be None")
+            logger.warning("[Stage B] NetworkX not available â€” CFG will be None")
             return None
         cfg=nx.DiGraph()
         for method_analysis in analysis.get_methods():
@@ -190,37 +186,15 @@ class DEXDisassembler:
     
     
     def _cache_path(self,apk_path:str)->Path:
-        """Deterministic cache file path based on the APK's SHA-256 prefix."""
-        sha_prefix=_quick_sha256_prefix(apk_path)
-        return Path(ANDROGUARD_CACHE_DIR)/f"{sha_prefix}.androguard.pkl"
+        """Deterministic cache file path based on full APK SHA-256."""
+        sha256=_full_sha256(apk_path)
+        return Path(ANDROGUARD_CACHE_DIR)/f"{sha256}.disabled"
     def _load_from_cache(self,apk_path:str)->Optional[tuple[Any,Any]]:
-        if not ANDROGUARD_CACHE_ENABLED:
-            return None
-        cache_file=self._cache_path(apk_path)
-        if not cache_file.is_file():
-            return None
-        try:
-            with open(cache_file,"rb")as fh:
-                data=pickle.load(fh)
-            logger.debug("[Stage B] Cache hit: %s",cache_file)
-            return data["analysis"],data["cfg"]
-        except Exception as exc:
-            logger.warning("[Stage B] Cache read failed (%s) — re-analysing",exc)
-            return None
+        """Unsafe pickle cache loading is intentionally disabled."""
+        return None
     def _save_to_cache(self,apk_path:str,analysis:Any,cfg:Any)->None:
-        if not ANDROGUARD_CACHE_ENABLED:
-            return
-        cache_file=self._cache_path(apk_path)
-        try:
-            with open(cache_file,"wb")as fh:
-                pickle.dump({"analysis":analysis,"cfg":cfg},fh,protocol=4)
-            logger.debug("[Stage B] Saved to cache: %s",cache_file)
-        except Exception as exc:
-            logger.warning("[Stage B] Cache write failed: %s",exc)
-    
-    
-    
-    @staticmethod
+        """Unsafe pickle cache persistence is intentionally disabled."""
+        return None    @staticmethod
     def _method_descriptor(method_analysis:Any)->str:
         """Build a canonical Smali-style method descriptor string."""
         m=method_analysis.method
@@ -235,10 +209,13 @@ class DEXDisassembler:
             return f"{method.get_class_name()}->{method.get_name()}{method.get_descriptor()}"
         except Exception:
             return str(method)
-def _quick_sha256_prefix(path:str,read_bytes:int=65536)->str:
-    """Read the first 64 KB and hash it for a fast cache key."""
+def _full_sha256(path:str)->str:
+    """Hash the full APK for any future safe cache metadata key."""
     import hashlib
     h=hashlib.sha256()
     with open(path,"rb")as fh:
-        h.update(fh.read(read_bytes))
-    return h.hexdigest()[:24]
+        for chunk in iter(lambda:fh.read(1024*1024),b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+

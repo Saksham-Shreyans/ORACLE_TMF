@@ -164,7 +164,16 @@ cython_debug/
 # Custom for project
 *.apk
 *.pdf
-*.json
 *.yar
 fix_*.py
 recover.py
+
+# Generated report outputs (not KB data)
+*_stix_bundle.json
+*_intelligence_brief.pdf
+*_forecast.yar
+oracle_tmf_report.json
+oracle_tmf_mag.json
+
+# ChromaDB local store
+data/knowledge_base/chroma_db/

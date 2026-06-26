@@ -1,5 +1,5 @@
-"""
-ORACLE-TMF  ·  engines/dte_engine.py
+﻿"""
+ORACLE-TMF  Â·  engines/dte_engine.py
 ======================================
 DORMANCY TAXONOMY ENGINE (DTE)
 The DTE is a 4-class XGBoost classifier that resolves a critical ambiguity:
@@ -9,34 +9,32 @@ third-party library inclusion (Firebase, Google Play Services, etc.).
 Without the DTE, the Stage D dead code list would be polluted with thousands
 of Firebase/Google SDK methods, flooding the LLM context and destroying signal.
 The DTE classifies each DeadCodeArtifact into exactly ONE of four classes:
-  ┌──────────────────────────┬──────────────────────────────────────────────────┐
-  │ Class                    │ Description                                       │
-  ├──────────────────────────┼──────────────────────────────────────────────────┤
-  │ REMNANT                  │ Benign SDK boilerplate → DISCARD immediately      │
-  │ SCAFFOLDING              │ Future capability stub → forward to Stage J       │
-  │ LOGIC_BOMB               │ Conditional dormant payload → HIGH PRIORITY       │
-  │ ENCRYPTED_DROPPER        │ Dynamic loader stub → Frida extraction path       │
-  └──────────────────────────┴──────────────────────────────────────────────────┘
+  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+  â”‚ Class                    â”‚ Description                                       â”‚
+  â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+  â”‚ REMNANT                  â”‚ Benign SDK boilerplate â†’ DISCARD immediately      â”‚
+  â”‚ SCAFFOLDING              â”‚ Future capability stub â†’ forward to Stage J       â”‚
+  â”‚ LOGIC_BOMB               â”‚ Conditional dormant payload â†’ HIGH PRIORITY       â”‚
+  â”‚ ENCRYPTED_DROPPER        â”‚ Dynamic loader stub â†’ Frida extraction path       â”‚
+  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
 Feature Vector (4 features, matching DTE_FEATURE_* constants in settings.py):
-  [0] trigger_depth   — max if-* nesting depth (logic bombs have depth ≥ 3)
-  [1] guard_entropy   — Shannon entropy of conditional operands (obfuscated = high)
-  [2] api_sensitivity — max sensitivity score of Android APIs in the method
-  [3] guard_indegree  — number of incoming xref edges (REMNANT has many callers)
+  [0] trigger_depth   â€” max if-* nesting depth (logic bombs have depth â‰¥ 3)
+  [1] guard_entropy   â€” Shannon entropy of conditional operands (obfuscated = high)
+  [2] api_sensitivity â€” max sensitivity score of Android APIs in the method
+  [3] guard_indegree  â€” number of incoming xref edges (REMNANT has many callers)
 Model: XGBoost, n_estimators=300, max_depth=6, learning_rate=0.1
 Training: Synthetic training set generated from domain expert heuristics.
           On first run, model is trained and saved to WORK_DIR.
           Subsequent runs load from the saved model file.
 Research basis:
-  • XGBoost: Chen & Guestrin (2016), https://arxiv.org/abs/1603.02754
-  • Feature engineering: ORACLE-TMF Section VI-C (DTE specification)
-  • Class distributions: derived from empirical malware analysis literature
+  â€¢ XGBoost: Chen & Guestrin (2016), https://arxiv.org/abs/1603.02754
+  â€¢ Feature engineering: ORACLE-TMF Section VI-C (DTE specification)
+  â€¢ Class distributions: derived from empirical malware analysis literature
 """
 from __future__ import annotations
 import logging
 import os
-import pickle
 import time
-from pathlib import Path
 from typing import Optional
 import numpy as np
 from config.settings import(
@@ -56,8 +54,6 @@ from config.settings import(
 from models.mutation_artifact_graph import DeadCodeArtifact,DTEClass
 logger=logging.getLogger(__name__)
 
-_MODEL_CACHE_PATH=os.path.join(WORK_DIR,".dte_xgboost_model.pkl")
-
 _LABEL_TO_INT:dict[str,int]={
     DTE_CLASS_REMNANT:0,
     DTE_CLASS_SCAFFOLDING:1,
@@ -74,7 +70,7 @@ _INT_TO_DTECLASS:dict[int,DTEClass]={
 }
 class DTEEngine:
     """
-    Dormancy Taxonomy Engine — XGBoost 4-class dormancy classifier.
+    Dormancy Taxonomy Engine â€” XGBoost 4-class dormancy classifier.
     Classifies each DeadCodeArtifact and updates its dte_label and
     dte_confidence fields IN-PLACE.  Returns the modified list.
     Usage
@@ -83,8 +79,12 @@ class DTEEngine:
     >>> classified = engine.classify(dead_code_artifacts)
     """
     def __init__(self)->None:
-        Path(WORK_DIR).mkdir(parents=True,exist_ok=True)
-        self._model=self._load_or_train_model()
+        os.makedirs(WORK_DIR,exist_ok=True)
+        try:
+            os.chmod(WORK_DIR,0o700)
+        except OSError:
+            pass
+        self._model=self._train_model()
     
     
     
@@ -116,7 +116,7 @@ class DTEEngine:
             y_pred=self._model.predict(X)
             y_proba=self._model.predict_proba(X)
         except Exception as exc:
-            logger.warning("[DTE] Prediction failed: %s — defaulting to SCAFFOLDING",exc)
+            logger.warning("[DTE] Prediction failed: %s â€” defaulting to SCAFFOLDING",exc)
             for a in artifacts:
                 a.dte_label=DTEClass.SCAFFOLDING
                 a.dte_confidence=0.5
@@ -155,10 +155,10 @@ class DTEEngine:
         """
         Build an (N, 4) feature matrix from the artifact list.
         Feature vector layout (matches settings.DTE_FEATURE_* indices):
-          [0] trigger_depth    → int   [0, ∞)
-          [1] guard_entropy    → float [0.0, 8.0]
-          [2] api_sensitivity  → float [0.0, 1.0]
-          [3] guard_indegree   → int   [0, ∞)
+          [0] trigger_depth    â†’ int   [0, âˆž)
+          [1] guard_entropy    â†’ float [0.0, 8.0]
+          [2] api_sensitivity  â†’ float [0.0, 1.0]
+          [3] guard_indegree   â†’ int   [0, âˆž)
         """
         rows=[]
         for a in artifacts:
@@ -174,17 +174,6 @@ class DTEEngine:
     
     
     
-    def _load_or_train_model(self)->object:
-        """Load saved model from disk or train a new one from synthetic data."""
-        if os.path.isfile(_MODEL_CACHE_PATH):
-            try:
-                with open(_MODEL_CACHE_PATH,"rb")as fh:
-                    model=pickle.load(fh)
-                logger.info("[DTE] Loaded saved XGBoost model from %s",_MODEL_CACHE_PATH)
-                return model
-            except Exception as exc:
-                logger.warning("[DTE] Failed to load saved model (%s) — retraining",exc)
-        return self._train_model()
     def _train_model(self)->object:
         """
         Train the DTE XGBoost classifier on a synthetic dataset.
@@ -192,17 +181,17 @@ class DTEEngine:
         feature distributions of each class.  The class imbalance mirrors
         real-world APK populations (most dead code is benign SDK remnants).
         Class proportions:
-          REMNANT (0)          : 5000 samples  (50%) — most dead code is benign
-          SCAFFOLDING (1)      : 3000 samples  (30%) — common in MaaS binaries
-          LOGIC_BOMB (2)       :  500 samples  (5%)  — rare but critical
-          ENCRYPTED_DROPPER (3):  200 samples  (2%)  — very rare, high-value
+          REMNANT (0)          : 5000 samples  (50%) â€” most dead code is benign
+          SCAFFOLDING (1)      : 3000 samples  (30%) â€” common in MaaS binaries
+          LOGIC_BOMB (2)       :  500 samples  (5%)  â€” rare but critical
+          ENCRYPTED_DROPPER (3):  200 samples  (2%)  â€” very rare, high-value
         Total: ~8700 samples, stratified.
         """
         try:
             from xgboost import XGBClassifier 
         except ImportError as exc:
             raise ImportError(
-                "xgboost not installed. Run: pip install xgboost --break-system-packages"
+                "xgboost not installed. Run inside the project virtualenv: python -m pip install xgboost"
             )from exc
         logger.info("[DTE] Training synthetic XGBoost model (%d estimators)...",DTE_N_ESTIMATORS)
         t0=time.perf_counter()
@@ -223,38 +212,32 @@ class DTEEngine:
         elapsed_ms=(time.perf_counter()-t0)*1000
         logger.info("[DTE] Model trained in %.1f ms",elapsed_ms)
         
-        try:
-            with open(_MODEL_CACHE_PATH,"wb")as fh:
-                pickle.dump(model,fh,protocol=4)
-            logger.info("[DTE] Model saved to %s",_MODEL_CACHE_PATH)
-        except Exception as exc:
-            logger.warning("[DTE] Could not save model: %s",exc)
         return model
     @staticmethod
     def _generate_synthetic_data(rng:np.random.Generator)->tuple[np.ndarray,np.ndarray]:
         """
         Generate synthetic training data for the DTE classifier.
         Feature distributions are derived from domain knowledge:
-        REMNANT (0) — SDK boilerplate:
-          • trigger_depth:   0-1  (no complex guards)
-          • guard_entropy:   0.0-1.5 (low complexity)
-          • api_sensitivity: 0.0-0.2 (benign APIs only)
-          • guard_indegree:  2-15 (has callers in the larger framework)
-        SCAFFOLDING (1) — Future capability stub:
-          • trigger_depth:   0-2  (simple guards or none)
-          • guard_entropy:   1.0-3.5 (moderate complexity)
-          • api_sensitivity: 0.4-0.9 (sensitive APIs present)
-          • guard_indegree:  0-2  (few/no callers → isolated)
-        LOGIC_BOMB (2) — Conditional dormant payload:
-          • trigger_depth:   3-8  (deeply nested guards)
-          • guard_entropy:   3.0-6.0 (highly complex conditions)
-          • api_sensitivity: 0.6-1.0 (destructive/spying APIs)
-          • guard_indegree:  0-1  (isolated — triggered by time/event)
-        ENCRYPTED_DROPPER (3) — Dynamic loader:
-          • trigger_depth:   1-4  (moderate guards)
-          • guard_entropy:   2.0-5.0 (obfuscated logic)
-          • api_sensitivity: 0.9-1.0 (DexClassLoader = 0.9+)
-          • guard_indegree:  0-1  (isolated)
+        REMNANT (0) â€” SDK boilerplate:
+          â€¢ trigger_depth:   0-1  (no complex guards)
+          â€¢ guard_entropy:   0.0-1.5 (low complexity)
+          â€¢ api_sensitivity: 0.0-0.2 (benign APIs only)
+          â€¢ guard_indegree:  2-15 (has callers in the larger framework)
+        SCAFFOLDING (1) â€” Future capability stub:
+          â€¢ trigger_depth:   0-2  (simple guards or none)
+          â€¢ guard_entropy:   1.0-3.5 (moderate complexity)
+          â€¢ api_sensitivity: 0.4-0.9 (sensitive APIs present)
+          â€¢ guard_indegree:  0-2  (few/no callers â†’ isolated)
+        LOGIC_BOMB (2) â€” Conditional dormant payload:
+          â€¢ trigger_depth:   3-8  (deeply nested guards)
+          â€¢ guard_entropy:   3.0-6.0 (highly complex conditions)
+          â€¢ api_sensitivity: 0.6-1.0 (destructive/spying APIs)
+          â€¢ guard_indegree:  0-1  (isolated â€” triggered by time/event)
+        ENCRYPTED_DROPPER (3) â€” Dynamic loader:
+          â€¢ trigger_depth:   1-4  (moderate guards)
+          â€¢ guard_entropy:   2.0-5.0 (obfuscated logic)
+          â€¢ api_sensitivity: 0.9-1.0 (DexClassLoader = 0.9+)
+          â€¢ guard_indegree:  0-1  (isolated)
         """
         samples_per_class={0:5000,1:3000,2:500,3:200}
         X_parts,y_parts=[],[]
@@ -299,3 +282,5 @@ class DTEEngine:
         
         idx=rng.permutation(len(X))
         return X[idx],y[idx]
+
+

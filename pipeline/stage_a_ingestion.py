@@ -36,6 +36,10 @@ from config.settings import(
     DEX_PACKED_SIZE_THRESHOLD,
     PACKER_STUB_CLASSES,
     WORK_DIR,
+    ZIP_MAX_FILE_COUNT,
+    ZIP_MAX_ENTRY_BYTES,
+    ZIP_MAX_TOTAL_UNCOMPRESSED_BYTES,
+    ZIP_MAX_COMPRESSION_RATIO,
 )
 from models.mutation_artifact_graph import APKMetadata
 logger=logging.getLogger(__name__)
@@ -138,7 +142,13 @@ class APKIngestion:
                 f"Not a valid APK/ZIP file — unexpected magic bytes: {magic.hex()}"
             )
     def _compute_standard_hashes(self,apk_path:str)->tuple[str,str]:
-        """Compute SHA-256 and MD5 hashes of the APK binary."""
+        """Compute SHA-256 (integrity) and MD5 (legacy fingerprint only) of the APK binary.
+
+        NOTE: MD5 is included solely as a legacy/non-security fingerprint for
+        compatibility with older threat-intel feeds.  It must NOT be used for
+        any integrity or security decision.  All security-relevant decisions
+        use SHA-256.
+        """
         sha256_hasher=hashlib.sha256()
         md5_hasher=hashlib.md5()
         with open(apk_path,"rb")as fh:
@@ -152,7 +162,10 @@ class APKIngestion:
         Falls back to an empty string if the ssdeep library is not installed.
         """
         try:
-            import ssdeep 
+            try:
+                import ssdeep # type: ignore
+            except ImportError:
+                import ppdeep as ssdeep # type: ignore
             return ssdeep.hash_from_file(apk_path)
         except ImportError:
             logger.debug("[Stage A] ssdeep not available — skipping fuzzy hash")
@@ -162,26 +175,75 @@ class APKIngestion:
             return ""
     def _safe_extract(self,apk_path:str)->str:
         """
-        Extract the APK (ZIP) to a working directory with full Zip Slip protection.
-        Zip Slip: a crafted ZIP entry with '../' paths can write files outside
-        the target directory.  We resolve each path and assert it remains under
-        the target directory before extraction.
+        Extract the APK (ZIP) to a working directory with full Zip Slip protection
+        and ZIP bomb defences.
+
+        Zip Slip fix: use Path.relative_to() for containment checking.
+        String prefix checks are unreliable (a sibling path with the same prefix
+        would pass).  relative_to() raises ValueError if target is outside the
+        extraction root, which we treat as a traversal attempt.
+
+        ZIP bomb defences:
+          • Max file count  (ZIP_MAX_FILE_COUNT)
+          • Max per-entry uncompressed size (ZIP_MAX_ENTRY_BYTES)
+          • Max total uncompressed size (ZIP_MAX_TOTAL_UNCOMPRESSED_BYTES)
+          • Max compression ratio per entry (ZIP_MAX_COMPRESSION_RATIO)
         """
         apk_stem=Path(apk_path).stem
         extract_dir=self._work_dir/f"{apk_stem}_{os.urandom(4).hex()}"
         extract_dir.mkdir(parents=True,exist_ok=True)
+        try:
+            os.chmod(extract_dir,0o700)
+        except OSError:
+            pass
         extract_dir_resolved=extract_dir.resolve()
         try:
             with zipfile.ZipFile(apk_path,"r")as zf:
-                for member in zf.infolist():
-                    
-                    target_path=(extract_dir_resolved/member.filename).resolve()
-                    if not str(target_path).startswith(str(extract_dir_resolved)):
+                members=zf.infolist()
+                # -- V-004 file-count guard --
+                if len(members)>ZIP_MAX_FILE_COUNT:
+                    raise APKIngestionError(
+                        f"APK contains {len(members)} entries, exceeding limit of {ZIP_MAX_FILE_COUNT}"
+                    )
+                total_uncompressed=0
+                for member in members:
+                    # -- V-004 per-entry size guard --
+                    if member.file_size>ZIP_MAX_ENTRY_BYTES:
+                        logger.warning(
+                            "[Stage A] ZIP entry too large (%d bytes), skipping: %s",
+                            member.file_size,member.filename,
+                        )
+                        continue
+                    # -- V-004 compression ratio guard (ZIP bomb) --
+                    if member.compress_size>0:
+                        ratio=member.file_size/member.compress_size
+                        if ratio>ZIP_MAX_COMPRESSION_RATIO:
+                            logger.warning(
+                                "[Stage A] Suspicious compression ratio %.0f:1, skipping: %s",
+                                ratio,member.filename,
+                            )
+                            continue
+                    # -- V-004 total uncompressed size guard --
+                    total_uncompressed+=member.file_size
+                    if total_uncompressed>ZIP_MAX_TOTAL_UNCOMPRESSED_BYTES:
+                        raise APKIngestionError(
+                            f"APK total uncompressed size exceeds {ZIP_MAX_TOTAL_UNCOMPRESSED_BYTES//1024//1024} MB limit"
+                        )
+                    # -- V-004 Zip Slip fix: use relative_to() instead of startswith() --
+                    try:
+                        target_path=(extract_dir_resolved/member.filename).resolve()
+                        target_path.relative_to(extract_dir_resolved)
+                    except ValueError:
                         logger.warning(
                             "[Stage A] Zip Slip attempt blocked: %s",member.filename
                         )
-                        continue 
-                    
+                        continue
+                    # -- Reject absolute paths and drive-qualified paths --
+                    if member.filename.startswith(("/","\\")) or (len(member.filename)>1 and member.filename[1]==":"):
+                        logger.warning(
+                            "[Stage A] Absolute/drive path blocked: %s",member.filename
+                        )
+                        continue
                     if member.is_dir():
                         target_path.mkdir(parents=True,exist_ok=True)
                     else:
@@ -324,6 +386,8 @@ class APKIngestion:
             )
             for match in class_pattern.finditer(raw):
                 text=match.group(0).decode("ascii",errors="ignore")
+                # Strip control characters before storing (V-027)
+                text=re.sub(r"[\x00-\x1f\x7f-\x9f]","",text)
                 if text and text not in entry_points:
                     entry_points.append(text[:120])
         except OSError as exc:

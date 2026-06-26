@@ -313,15 +313,27 @@ class TMFReflect:
     
     
     def _get_sbert(self)->Optional[Any]:
-        """Lazy-load the Sentence-BERT model on first use."""
+        """Lazy-load the Sentence-BERT model on first use.
+
+        V-022: Set ORACLE_TMF_SBERT_LOCAL_ONLY=1 in production to prevent
+        unexpected outbound network calls to download model weights.
+        When set, the model must already be present in the HuggingFace cache.
+        """
         if not self._sbert_available:
             return None
         if self._sbert_model is not None:
             return self._sbert_model
         try:
-            from sentence_transformers import SentenceTransformer 
-            self._sbert_model=SentenceTransformer(SBERT_MODEL)
-            logger.debug("[TMF-REFLECT] SBERT model loaded: %s",SBERT_MODEL)
+            from sentence_transformers import SentenceTransformer
+            local_only=os.getenv("ORACLE_TMF_SBERT_LOCAL_ONLY","0")=="1"
+            if local_only:
+                self._sbert_model=SentenceTransformer(
+                    SBERT_MODEL,
+                    local_files_only=True,
+                )
+            else:
+                self._sbert_model=SentenceTransformer(SBERT_MODEL)
+            logger.debug("[TMF-REFLECT] SBERT model loaded: %s (local_only=%s)",SBERT_MODEL,local_only)
         except ImportError:
             logger.warning(
                 "[TMF-REFLECT] sentence-transformers not installed — "

@@ -1,5 +1,5 @@
-"""
-ORACLE-TMF  ·  config/settings.py
+﻿"""
+ORACLE-TMF  Â·  config/settings.py
 ===================================
 Single source of truth for every tunable constant in the pipeline.
 Rule: No magic numbers anywhere else in the codebase.
@@ -23,6 +23,17 @@ LLM_MAX_TOKENS:Final[int]=4096
 
 APK_MAX_SIZE_BYTES:Final[int]=100*1024*1024
 APK_MIN_SIZE_BYTES:Final[int]=1*1024
+UPLOAD_READ_CHUNK_BYTES:Final[int]=1024*1024
+ZIP_MAX_FILE_COUNT:Final[int]=4096
+ZIP_MAX_ENTRY_BYTES:Final[int]=64*1024*1024
+ZIP_MAX_TOTAL_UNCOMPRESSED_BYTES:Final[int]=250*1024*1024
+ZIP_MAX_COMPRESSION_RATIO:Final[int]=100
+XML_MAX_BYTES:Final[int]=2*1024*1024
+API_KEY_ENV:Final[str]="ORACLE_TMF_API_KEY"
+API_RATE_LIMIT_REQUESTS:Final[int]=5
+API_RATE_LIMIT_WINDOW_SECONDS:Final[int]=60
+RESULT_CACHE_MAX_ENTRIES:Final[int]=64
+RESULT_CACHE_TTL_SECONDS:Final[int]=3600
 
 PACKER_STUB_CLASSES:Final[list[str]]=[
     "StubApp",
@@ -37,12 +48,12 @@ PACKER_STUB_CLASSES:Final[list[str]]=[
 ]
 
 DEX_PACKED_SIZE_THRESHOLD:Final[int]=5*1024*1024
-WORK_DIR:Final[str]="/tmp/oracle_tmf_workspace"
+WORK_DIR:Final[str]=os.getenv("ORACLE_TMF_WORK_DIR",os.path.join(os.path.expanduser("~"),".oracle_tmf","workspace"))
 
 
 
 
-ANDROGUARD_CACHE_ENABLED:Final[bool]=True
+ANDROGUARD_CACHE_ENABLED:Final[bool]=os.getenv("ORACLE_TMF_ENABLE_ANDROGUARD_CACHE","0")=="1"
 ANDROGUARD_CACHE_DIR:Final[str]=os.path.join(WORK_DIR,".androguard_cache")
 
 
@@ -258,3 +269,5 @@ LOG_LEVEL:Final[str]=os.getenv("ORACLE_TMF_LOG_LEVEL","INFO")
 LOG_FORMAT:Final[str]=(
     "%(asctime)s | %(levelname)-8s | %(name)-35s | %(message)s"
 )
+
+

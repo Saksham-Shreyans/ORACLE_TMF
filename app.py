@@ -238,7 +238,7 @@ def render_overview(result):
     if mag.stage_errors:
         with st.expander(f"⚠️ {len(mag.stage_errors)} Stage Error(s)",expanded=False):
             for stage,err in mag.stage_errors.items():
-                st.error(f"**{stage}**: {err}")
+                st.error(f"**{escaped(stage)}**: {escaped(err)}")
 
 
 
@@ -253,7 +253,7 @@ def render_artifacts(result):
             for i,a in enumerate(mag.dead_code[:20],1):
                 dte_chip=_dte_chip(a.dte_label.value if hasattr(a.dte_label,"value")else str(a.dte_label))
                 st.markdown(
-                    f"**#{i}** `{a.class_name}` → `{a.method_name[:60]}`  "
+                    f"**#{i}** `{escaped(a.class_name)}` → `{escaped(a.method_name[:60])}`  "
                     f"{dte_chip}  conf={a.dte_confidence:.2f}  opcodes={a.opcode_count}",
                     unsafe_allow_html=True,
                 )
@@ -322,10 +322,10 @@ def render_artifacts(result):
             for a in mag.genai_scaffolds:
                 st.warning(
                     f"⚠️ **AI-Augmented Malware Scaffold Detected!**  "
-                    f"Provider: **{a.provider}**  |  Model: `{a.model_hint or 'unknown'}`  "
-                    f"|  Endpoint: `{a.api_endpoint[:60]}`"
+                    f"Provider: **{escaped(a.provider)}**  |  Model: `{escaped(a.model_hint or 'unknown')}`  "
+                    f"|  Endpoint: `{escaped(a.api_endpoint[:60])}`"
                 )
-                st.markdown(f"**Class**: `{a.class_name}` → `{a.method_name[:60]}`")
+                st.markdown(f"**Class**: `{escaped(a.class_name)}` → `{escaped(a.method_name[:60])}`")
                 st.divider()
 
 
@@ -374,15 +374,17 @@ def render_forecasts(result):
                     fig_c=_make_confidence_breakdown(f)
                     st.plotly_chart(fig_c,use_container_width=True,config={"displayModeBar":False})
             with col_detail:
-                st.markdown(f"**#{i} Prediction: {f.predicted_technique}**")
-                st.markdown(f"🎯 **Tactic**: `{f.predicted_tactic}`  |  **Technique**: `{f.predicted_technique}` — *{f.technique_name}*")
+                st.markdown(f"**#{i} Prediction: {escaped(f.predicted_technique)}**")
+                st.markdown(f"🎯 **Tactic**: `{escaped(f.predicted_tactic)}`  |  **Technique**: `{escaped(f.predicted_technique)}` — *{escaped(f.technique_name)}*")
                 if f.predicted_target_institutions:
-                    st.markdown(f"🏦 **Target Institutions**: {', '.join(f.predicted_target_institutions[:3])}")
+                    safe_insts=', '.join(escaped(t) for t in f.predicted_target_institutions[:3])
+                    st.markdown(f"🏦 **Target Institutions**: {safe_insts}")
                 if f.predicted_target_countries:
-                    st.markdown(f"🌍 **Target Countries**: {', '.join(f.predicted_target_countries[:5])}")
+                    safe_countries=', '.join(escaped(c) for c in f.predicted_target_countries[:5])
+                    st.markdown(f"🌍 **Target Countries**: {safe_countries}")
                 if f.rationale:
-                    with st.expander("📖 LLM Chain-of-Thought Rationale"):
-                        st.markdown(f.rationale[:800])
+                    with st.expander("📖 Model Evidence Summary"):
+                        st.markdown(escaped(f.rationale[:800]))
                 st.markdown(
                     f"**Bayesian Decomposition**:  "
                     f"P_LLM={f.p_llm:.3f} × 0.45  +  "
@@ -519,7 +521,8 @@ def _make_evolutionary_timeline(mag):
                        showarrow=False,font=dict(color="#555577",size=9))
     
     total_arts=mag.total_artifact_count()
-    family=mag.malware_family or "UNKNOWN"
+    import html as _html
+    family=_html.escape(mag.malware_family or "UNKNOWN")  # V-015: escape APK-derived string
     fig.add_trace(go.Scatter(
         x=[1],y=[0],mode="markers",
         marker=dict(size=115,color="rgba(0,40,100,0.8)",line=dict(color="#00f5ff",width=5)),
@@ -540,14 +543,18 @@ def _make_evolutionary_timeline(mag):
     passed=mag.high_confidence_forecasts()
     if passed:
         fc=passed[0]
-        tech_short=fc.predicted_technique
+        import html as _html
+        # V-015: Escape all APK/LLM-derived strings before inserting into HTML-capable Plotly fields
+        tech_short=_html.escape(str(fc.predicted_technique))
+        tactic_safe=_html.escape(str(fc.predicted_tactic))
+        tech_name_safe=_html.escape(str(fc.technique_name))
         conf_txt=f"C={fc.confidence_score:.2f}"
         hover_txt=(
             f"<b>v_n+1 — PREDICTED</b><br>"
             f"Technique: {tech_short}<br>"
-            f"{fc.technique_name}<br>"
+            f"{tech_name_safe}<br>"
             f"Confidence: {fc.confidence_score:.3f}<br>"
-            f"Tactic: {fc.predicted_tactic}<extra></extra>"
+            f"Tactic: {tactic_safe}<extra></extra>"
         )
         node_text=f"<b>v_n+1</b><br><span style='font-size:10px'>{tech_short}</span>"
         node_color="rgba(0,80,20,0.5)"
@@ -602,14 +609,16 @@ def _make_confidence_breakdown(fc):
 
 def _dte_chip(label:str)->str:
     """Return coloured HTML chip for a DTE classification label."""
+    import html as _html
     cls_map={
         "SCAFFOLDING":"chip-scaffolding",
         "LOGIC_BOMB":"chip-logic_bomb",
         "ENCRYPTED_DROPPER":"chip-dropper",
         "REMNANT":"chip-remnant",
     }
+    safe_label=_html.escape(str(label))
     css=cls_map.get(label,"chip-remnant")
-    return f'<span class="{css}">{label}</span>'
+    return f'<span class="{css}">{safe_label}</span>'
 
 
 
@@ -638,7 +647,11 @@ def main()->None:
         st.session_state.analysis_result=result
         st.session_state.analysis_error=err
         if err:
-            st.error(f"Analysis failed: {err}")
+            # V-023: Do not expose internal exception details to the UI.
+            # Log the full error internally; show a generic message to the analyst.
+            import logging as _logging
+            _logging.getLogger(__name__).error("Analysis pipeline error: %s", err)
+            st.error("Analysis failed. Check server logs for details.")
         elif result and result.success:
             st.success(f"✅ Analysis complete in {result.total_time_ms/1000:.1f}s")
     

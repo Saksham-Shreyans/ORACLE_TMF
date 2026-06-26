@@ -1,7 +1,7 @@
-"""
-ORACLE-TMF  ·  engines/unfinished_ui_detector.py
+﻿"""
+ORACLE-TMF  Â·  engines/unfinished_ui_detector.py
 =================================================
-CLASS 6 — Unfinished UI Flow Detection
+CLASS 6 â€” Unfinished UI Flow Detection
 RATIONALE:
   Malware graphical assets (phishing overlays, fake banking screens, WebView
   shells) are typically finalised by UI designers BEFORE the backend payload
@@ -13,44 +13,45 @@ RATIONALE:
   via setContentView(), Fragment.inflate(), or LayoutInflater.inflate().
   These "orphaned layouts" are Class 6 mutation artifacts.
 DETECTION ALGORITHM:
-  Step 1 — Enumerate layouts:
+  Step 1 â€” Enumerate layouts:
     List all XML files under res/layout/ in the extracted APK directory.
     Also check res/layout-land/, res/layout-sw600dp/, etc. (alternative layouts).
-  Step 2 — Build the inflation reference set:
+  Step 2 â€” Build the inflation reference set:
     Scan all DEX Smali code for:
-      a) setContentView(<integer>)  — Activity layout inflation
-      b) LayoutInflater.inflate(<integer>, ...)  — Fragment/View inflation
-      c) DataBindingUtil.inflate(...)  — DataBinding inflation
-      d) View.inflate(<integer>, ...)  — In-code inflation
+      a) setContentView(<integer>)  â€” Activity layout inflation
+      b) LayoutInflater.inflate(<integer>, ...)  â€” Fragment/View inflation
+      c) DataBindingUtil.inflate(...)  â€” DataBinding inflation
+      d) View.inflate(<integer>, ...)  â€” In-code inflation
     Extract the integer constant argument from each call.
-  Step 3 — Map integers to layout names:
+  Step 3 â€” Map integers to layout names:
     Use Androguard's resource parser to map resource IDs to layout names.
-    Fallback: Parse res/values/public.xml for the ID ↔ name mapping.
+    Fallback: Parse res/values/public.xml for the ID â†” name mapping.
     Second fallback: String-based matching (layout file name in DEX string pool).
-  Step 4 — Identify orphaned layouts:
+  Step 4 â€” Identify orphaned layouts:
     Any layout file whose resource ID is NOT found in the inflation reference set
     is an unfinished UI flow.
-  Step 5 — Classify each orphaned layout:
+  Step 5 â€” Classify each orphaned layout:
     Parse the XML to determine its likely purpose:
-      • "phishing_overlay"    — login form with financial field names
-      • "webview_shell"       — WebView element with no Activity code
-      • "banking_overlay"     — layout referencing bank branding assets
-      • "credential_harvester"— password/PIN input fields
-      • "generic_dormant"    — unclassified orphaned layout
+      â€¢ "phishing_overlay"    â€” login form with financial field names
+      â€¢ "webview_shell"       â€” WebView element with no Activity code
+      â€¢ "banking_overlay"     â€” layout referencing bank branding assets
+      â€¢ "credential_harvester"â€” password/PIN input fields
+      â€¢ "generic_dormant"    â€” unclassified orphaned layout
 Research basis:
-  • Android documentation: developer.android.com/reference/android/app/Activity#setContentView
-  • ORACLE-TMF Section V-A: "Artifact Class 6: Unfinished UI Flows"
-  • Threat Fabric Android banking trojan UI overlay methodology (2024)
+  â€¢ Android documentation: developer.android.com/reference/android/app/Activity#setContentView
+  â€¢ ORACLE-TMF Section V-A: "Artifact Class 6: Unfinished UI Flows"
+  â€¢ Threat Fabric Android banking trojan UI overlay methodology (2024)
 """
 from __future__ import annotations
 import logging
 import os
 import re
 import time
-import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any,Optional
+from config.settings import XML_MAX_BYTES
 from models.mutation_artifact_graph import UnfinishedUIFlowArtifact
+from security import safe_xml_fromstring, safe_xml_parse
 logger=logging.getLogger(__name__)
 
 
@@ -88,7 +89,7 @@ class UnfinishedUIDetector:
     """
     Class 6: Unfinished UI Flow Detector.
     Identifies XML layout files present in the APK that are never
-    inflated by any Java/Kotlin code — indicating dormant phishing
+    inflated by any Java/Kotlin code â€” indicating dormant phishing
     overlays or incomplete attack UI components.
     Usage
     -----
@@ -109,8 +110,8 @@ class UnfinishedUIDetector:
         Execute Class 6 unfinished UI flow detection.
         Parameters
         ----------
-        apk_path    : str — path to the original .apk file
-        extract_dir : str — extracted APK directory (Stage A output)
+        apk_path    : str â€” path to the original .apk file
+        extract_dir : str â€” extracted APK directory (Stage A output)
         analysis    : Androguard Analysis object (Stage B output), or None
         Returns
         -------
@@ -122,7 +123,7 @@ class UnfinishedUIDetector:
         
         layout_files=self._enumerate_layout_files(extract_dir,apk_path)
         if not layout_files:
-            logger.debug("[Class 6] No layout files found — skipping")
+            logger.debug("[Class 6] No layout files found â€” skipping")
             return artifacts
         logger.debug("[Class 6] Layout files found: %d",len(layout_files))
         
@@ -191,8 +192,8 @@ class UnfinishedUIDetector:
         Scan all DEX Smali methods for layout inflation calls and extract
         the integer resource ID arguments.
         Returns:
-          inflated_ids   : set[int]  — resource integer IDs referenced in inflation calls
-          inflated_names : set[str]  — layout name strings found in DEX string pool
+          inflated_ids   : set[int]  â€” resource integer IDs referenced in inflation calls
+          inflated_names : set[str]  â€” layout name strings found in DEX string pool
         """
         inflated_ids:set[int]=set()
         inflated_names:set[str]=set()
@@ -240,7 +241,7 @@ class UnfinishedUIDetector:
         self,extract_dir:str,apk_path:str
     )->dict[int,str]:
         """
-        Build a mapping from integer resource ID → layout file name.
+        Build a mapping from integer resource ID â†’ layout file name.
         Tries two sources in order:
           1. res/values/public.xml (present in some APKs after aapt2 compilation)
           2. Androguard's ARSCParser for the binary resources.arsc
@@ -250,7 +251,9 @@ class UnfinishedUIDetector:
         public_xml=os.path.join(extract_dir,"res","values","public.xml")
         if os.path.isfile(public_xml):
             try:
-                tree=ET.parse(public_xml)
+                if os.path.getsize(public_xml)>XML_MAX_BYTES:
+                    raise ValueError("public.xml exceeds XML size limit")
+                tree=safe_xml_parse(public_xml)
                 for element in tree.getroot().findall(".//public"):
                     if element.get("type")=="layout":
                         name=element.get("name","")
@@ -336,7 +339,9 @@ class UnfinishedUIDetector:
         asset_refs:list[str]=[]
         suspected_type="generic_dormant"
         try:
-            tree=ET.fromstring(xml_content)
+            if len(xml_content.encode("utf-8",errors="ignore"))>XML_MAX_BYTES:
+                return None
+            tree=safe_xml_fromstring(xml_content)
             root_tag=tree.tag
             
             id_re=re.compile(r'@\+id/(\w+)')
@@ -350,7 +355,7 @@ class UnfinishedUIDetector:
                         ref=m.group(1)or m.group(2)
                         if ref and ref not in asset_refs:
                             asset_refs.append(ref)
-        except ET.ParseError:
+        except Exception:
             pass
         
         xml_lower=xml_content.lower()
@@ -399,3 +404,5 @@ class UnfinishedUIDetector:
             return method_analysis.method.get_source()or ""
         except Exception:
             return ""
+
+

@@ -1,27 +1,27 @@
-"""
-ORACLE-TMF  ·  pipeline/stage_f_string_mining.py
+﻿"""
+ORACLE-TMF  Â·  pipeline/stage_f_string_mining.py
 =================================================
-STAGE F — String Resource and Placeholder Mining
+STAGE F â€” String Resource and Placeholder Mining
 Responsibility:
-  • Scan the DEX global string pool for high-entropy or patterned strings
-  • Scan res/values/strings.xml for placeholder keys and staging values
-  • Detect: TODO/FIXME markers, staging URLs, hardcoded IPs, empty JSON
+  â€¢ Scan the DEX global string pool for high-entropy or patterned strings
+  â€¢ Scan res/values/strings.xml for placeholder keys and staging values
+  â€¢ Detect: TODO/FIXME markers, staging URLs, hardcoded IPs, empty JSON
     schemas, C2 path patterns, .onion addresses, crypto wallet addresses
-  • Compute Shannon entropy for each candidate string
-  • Return a list of PlaceholderStringArtifact objects
+  â€¢ Compute Shannon entropy for each candidate string
+  â€¢ Return a list of PlaceholderStringArtifact objects
 Inputs:
-  apk_path    : str  — path to .apk
-  extract_dir : str  — extracted APK directory (Stage A output)
+  apk_path    : str  â€” path to .apk
+  extract_dir : str  â€” extracted APK directory (Stage A output)
   analysis    : Androguard Analysis object (Stage B output)
 Outputs: list[PlaceholderStringArtifact]
 Algorithm:
   Two-pass strategy:
-    Pass 1 — DEX String Pool:
+    Pass 1 â€” DEX String Pool:
       Androguard's dx.get_strings() yields every string constant embedded
       in the DEX bytecode.  Each string is evaluated against:
         a) Shannon entropy >= STRING_HIGH_ENTROPY_THRESHOLD
         b) PLACEHOLDER_PATTERNS regex dictionary
-    Pass 2 — res/values/strings.xml:
+    Pass 2 â€” res/values/strings.xml:
       Parse the XML resource file from the extracted APK directory.
       Flag any string value matching PLACEHOLDER_PATTERNS.
 """
@@ -31,14 +31,15 @@ import math
 import os
 import re
 import time
-import xml.etree.ElementTree as ET
 from typing import Any
 from config.settings import(
     PLACEHOLDER_PATTERNS,
     STRING_HIGH_ENTROPY_THRESHOLD,
     STRING_MIN_LENGTH,
+    XML_MAX_BYTES,
 )
 from models.mutation_artifact_graph import PlaceholderStringArtifact
+from security import safe_xml_parse
 logger=logging.getLogger(__name__)
 
 _COMPILED_PATTERNS:dict[str,re.Pattern]={
@@ -74,8 +75,8 @@ class StringMiner:
         Execute Stage F.
         Parameters
         ----------
-        apk_path    : str — path to the original .apk
-        extract_dir : str — extracted APK directory
+        apk_path    : str â€” path to the original .apk
+        extract_dir : str â€” extracted APK directory
         analysis    : Androguard Analysis object
         Returns
         -------
@@ -135,7 +136,10 @@ class StringMiner:
             logger.debug("[Stage F] No res/values/strings.xml found")
             return artifacts
         try:
-            tree=ET.parse(strings_xml)
+            if os.path.getsize(strings_xml)>XML_MAX_BYTES:
+                logger.warning("[Stage F] strings.xml exceeds XML size limit")
+                return artifacts
+            tree=safe_xml_parse(strings_xml)
             root=tree.getroot()
             for element in root.findall(".//string"):
                 key_name=element.get("name","")
@@ -147,10 +151,8 @@ class StringMiner:
                 )
                 if artifact is not None:
                     artifacts.append(artifact)
-        except ET.ParseError as exc:
-            logger.debug("[Stage F] strings.xml parse error: %s",exc)
         except Exception as exc:
-            logger.warning("[Stage F] Resource string mining error: %s",exc)
+            logger.debug("[Stage F] strings.xml parse/mining error: %s",exc)
         return artifacts
     
     
@@ -188,11 +190,11 @@ class StringMiner:
     def _shannon_entropy(text:str)->float:
         """
         Compute the Shannon entropy of a string.
-        H(X) = -Σ p(x) * log₂(p(x))
+        H(X) = -Î£ p(x) * logâ‚‚(p(x))
         A high entropy value (> 4.5) indicates a string that is random-looking
         (encrypted payload, encoded URL, base64 data, etc.).
-        Pure lowercase English text has entropy ≈ 3.0–4.0.
-        Completely random bytes have entropy ≈ 7.5–8.0.
+        Pure lowercase English text has entropy â‰ˆ 3.0â€“4.0.
+        Completely random bytes have entropy â‰ˆ 7.5â€“8.0.
         """
         if not text:
             return 0.0
@@ -201,3 +203,5 @@ class StringMiner:
             freq[char]=freq.get(char,0)+1
         total=len(text)
         return-sum((c/total)*math.log2(c/total)for c in freq.values())
+
+

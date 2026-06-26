@@ -433,11 +433,23 @@ class TargetingIntelligence:
     
     @staticmethod
     def _load_taxonomy()->dict:
-        """Load the bank package taxonomy JSON from disk."""
+        """Load the bank package taxonomy JSON from disk.
+
+        V-020: The file hash is logged so that unexpected drift from the
+        committed version can be detected in audit logs.  For high-assurance
+        deployments, compare the logged hash against the expected value from
+        version control or a signed manifest.
+        """
+        import hashlib as _hashlib
         try:
             if os.path.isfile(BANK_TAXONOMY_PATH):
                 with open(BANK_TAXONOMY_PATH,"r",encoding="utf-8")as fh:
-                    return json.load(fh)
+                    raw=fh.read()
+                kb_hash=_hashlib.sha256(raw.encode("utf-8","replace")).hexdigest()[:16]
+                logger.info("[Targeting] Loaded bank taxonomy: %s (sha256_prefix=%s)",
+                            BANK_TAXONOMY_PATH,kb_hash)
+                import json as _json
+                return _json.loads(raw)
         except Exception as exc:
             logger.warning("[Targeting] Failed to load bank taxonomy: %s",exc)
         
