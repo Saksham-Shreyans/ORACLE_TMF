@@ -1,0 +1,50 @@
+# ============================================================
+# ORACLE-TMF: Observational Reasoning and Coercive Analysis
+#             for Latent Evolution — Temporal Mutation Forecaster
+# ============================================================
+# Install: pip install -r requirements.txt --break-system-packages
+
+# ── Core Android Analysis ──────────────────────────────────
+androguard==3.4.0          # DEX disassembly, CFG, Smali, manifest parsing
+networkx>=3.2.0            # Graph algorithms (BFS, CFG reachability)
+
+# ── LLM & Agent Orchestration ─────────────────────────────
+anthropic>=0.30.0          # Claude API (Sonnet for agents)
+langchain>=0.2.0           # Agent chaining framework
+langchain-anthropic>=0.1.0 # LangChain <-> Anthropic bridge
+
+# ── Vector DB & RAG ───────────────────────────────────────
+chromadb>=0.5.0            # Persistent vector store for MITRE + MalNet RAG
+sentence-transformers>=2.7.0  # Sentence-BERT for RDG resolution & semantic similarity
+
+# ── ML / Classification ───────────────────────────────────
+xgboost>=2.0.0             # DTE 4-class dormancy classifier (300 estimators)
+scikit-learn>=1.4.0        # Feature pipelines, train/test split, metrics
+numpy>=1.26.0              # Numerical computation
+scipy>=1.12.0              # Statistical distributions for Bayesian scoring
+
+# ── Cryptography & File Handling ──────────────────────────
+cryptography>=42.0.0       # PKCS7 APK certificate parsing (Stage A)
+python-magic>=0.4.27       # MIME type detection (anti-analysis check)
+
+# ── Fuzzy Hashing ─────────────────────────────────────────
+# ssdeep>=3.4              # Context-triggered piecewise hash (install separately: apt-get install libfuzzy-dev)
+# Alternative pure-python implementation used if ssdeep is unavailable
+
+# ── Output Generation ─────────────────────────────────────
+fpdf2>=2.7.9               # PDF brief generation (Stage L)
+stix2>=3.0.0               # STIX 2.1 threat intelligence bundle
+PyYAML>=6.0.1              # YAML serialization for YARA rules + configs
+
+# ── Frontend Dashboard ────────────────────────────────────
+streamlit>=1.35.0          # Rapid prototyping dashboard
+plotly>=5.22.0             # Interactive charts (gauge, timeline, treemap)
+pandas>=2.2.0              # Tabular data handling for dashboard tables
+
+# ── XML / AXML Parsing ────────────────────────────────────
+lxml>=5.2.0                # Manifest XML parsing (fallback)
+
+# ── Utility ───────────────────────────────────────────────
+python-dateutil>=2.9.0     # Date parsing for versioned APK ordering
+tqdm>=4.66.0               # Progress bars for pipeline stages
+colorlog>=6.8.0            # Coloured logging output
