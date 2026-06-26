@@ -2,18 +2,14 @@
 ORACLE-TMF  ·  pipeline/
 ==========================
 The 12-stage analysis pipeline (Stages A through L).
-
 ISOLATION CONTRACT:
   Each stage is an independent Python module.  Do NOT import stages
   from this __init__.py — doing so would cause a single import failure
   (e.g. missing Androguard) to cascade across unrelated stages.
-
   Import stages DIRECTLY in the orchestrator:
-
       from pipeline.stage_a_ingestion       import APKIngestion
       from pipeline.stage_b_dex_disassembly import DEXDisassembler
       ...
-
 Stage index
 -----------
   stage_a_ingestion.py        APK Ingestion & Preprocessing
@@ -29,4 +25,4 @@ Stage index
   stage_k_bayesian_scorer.py  Bayesian Confidence Scoring
   stage_l_report_synthesizer  Forecast Report Synthesizer
 """
-__version__ = "1.0.0"
+__version__="1.0.0"

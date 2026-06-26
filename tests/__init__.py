@@ -2,13 +2,10 @@
 ORACLE-TMF  ·  tests/
 =======================
 Unit and integration test suite.
-
 Run all tests:
     python -m pytest tests/ -v
-
 Run a single module:
     python -m pytest tests/test_stage_a.py -v
-
 Test modules
 ------------
   test_mag.py           MutationArtifactGraph schema, serialisation, helpers

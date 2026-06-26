@@ -5,7 +5,7 @@
 # Install: pip install -r requirements.txt --break-system-packages
 
 # ── Core Android Analysis ──────────────────────────────────
-androguard==3.4.0          # DEX disassembly, CFG, Smali, manifest parsing
+androguard>=3.4.0a1        # DEX disassembly, CFG, Smali, manifest parsing
 networkx>=3.2.0            # Graph algorithms (BFS, CFG reachability)
 
 # ── LLM & Agent Orchestration ─────────────────────────────
