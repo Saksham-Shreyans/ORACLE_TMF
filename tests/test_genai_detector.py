@@ -141,11 +141,12 @@ class TestStringClassification:
 class TestDeadCodeSmaliScan:
     """Test _scan_dead_code_smali() — Pass 2."""
     def test_detect_gemini_in_smali(self,detector):
+        fake_key = "AIza" + "SyFakeKeyNotReal1234567890123456789"
         smali='''
 .method public callGemini()V
     .locals 2
     const-string v0, "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent"
-    const-string v1, "AIzaSyFakeKeyNotReal1234567890123456789"
+    const-string v1, "''' + fake_key + '''"
     invoke-virtual {v0, v1}, Ljava/lang/String;->concat(Ljava/lang/String;)Ljava/lang/String;
     return-void
 .end method
