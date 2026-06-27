@@ -335,7 +335,7 @@ class APKIngestion:
         Falls back to empty strings if Androguard is unavailable.
         """
         try:
-            from androguard.core.bytecodes.apk import APK 
+            from androguard.core.bytecodes.apk import APK # type: ignore
             apk=APK(apk_path)
             return(
                 apk.get_package()or "",
@@ -354,7 +354,7 @@ class APKIngestion:
         Falls back to (0, 0) on failure.
         """
         try:
-            from androguard.core.bytecodes.apk import APK 
+            from androguard.core.bytecodes.apk import APK # type: ignore 
             
             
             manifest_path=os.path.join(extract_dir,"AndroidManifest.xml")

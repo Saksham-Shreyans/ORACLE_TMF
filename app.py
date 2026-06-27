@@ -24,6 +24,7 @@ import sys
 import tempfile
 import time
 from pathlib import Path
+from security import clean_text, escaped
 import streamlit as st
 
 st.set_page_config(
@@ -159,8 +160,7 @@ def render_sidebar()->tuple:
         st.markdown(
             "<small style='color:#555577'>"
             "ORACLE-TMF v1.0.0<br>"
-            "© 2026 Saksham Shreyans et al.<br>"
-            "RGIPT · PSB CyberShield</small>",
+            ">",
             unsafe_allow_html=True,
         )
     return uploaded,prev_uploaded,deobf,skip_llm,run_btn
