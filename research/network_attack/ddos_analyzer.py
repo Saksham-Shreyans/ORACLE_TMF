@@ -242,12 +242,14 @@ class NetworkAttackAnalyzer:
         if evidence_count<3:
             return None
         seed_source="UNKNOWN"
-        if "getTime()" in all_smali or "currentTimeMillis" in all_smali:
-            seed_source="TIMESTAMP"
-        elif "getDeviceId" in all_smali or "getImei" in all_smali:
-            seed_source="DEVICE_ID"
-        elif "getTime()" in all_smali and "getDeviceId" in all_smali:
+        has_time = "getTime()" in all_smali or "currentTimeMillis" in all_smali
+        has_device = "getDeviceId" in all_smali or "getImei" in all_smali
+        if has_time and has_device:
             seed_source="HYBRID"
+        elif has_time:
+            seed_source="TIMESTAMP"
+        elif has_device:
+            seed_source="DEVICE_ID"
         tlds=[s for s in all_strings if re.match(r"^\.\w{2,6}$",s)]
         daily_estimate=24 if seed_source=="TIMESTAMP" else 365
         tld_pattern="|".join(re.escape(t)for t in tlds[:10])if tlds else r"\.\w{2,6}"
@@ -276,8 +278,8 @@ class NetworkAttackAnalyzer:
             if c2.extracted_url and c2.extracted_url.startswith("http"):
                 host=re.sub(r"https?://([^/]+).*",r"\1",c2.extracted_url)
                 rules.append(
-                    f'alert http any any->any any(msg:"ORACLE-TMF C2 block:{host}";'
-                    f'content:"{host}";http_host;sid:{9000100+i};rev:1;)'
+                    f'alert http any any -> any any (msg:"ORACLE-TMF C2 block: {host}"; '
+                    f'content:"{host}"; http_host; sid:{9000100+i}; rev:1;)'
                 )
         return rules
     def _generate_stix_indicators(
