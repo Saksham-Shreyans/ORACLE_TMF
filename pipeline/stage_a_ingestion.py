@@ -1,25 +1,3 @@
-"""
-ORACLE-TMF  ·  pipeline/stage_a_ingestion.py
-=============================================
-STAGE A — APK Ingestion and Preprocessing
-Responsibility:
-  • Accept a raw .apk binary path
-  • Validate the APK (size, magic bytes, ZIP integrity)
-  • Extract the ZIP contents with Zip Slip protection
-  • Compute file hashes: SHA-256, MD5, SSDeep (fuzzy)
-  • Extract and parse the signing certificate (PKCS#7)
-  • Detect anti-analysis packer stubs
-  • Populate APKMetadata in the MAG
-Inputs:  Raw .apk file path (str)
-Outputs: Populated APKMetadata + extracted APK working directory path
-This stage has NO dependency on Androguard (that is Stage B).
-It only performs I/O and cryptographic operations.
-Edge Cases Handled:
-  • Zip Slip attack (path traversal in ZIP entries)
-  • APK too large (> 100 MB) or too small (< 1 KB)
-  • Missing or corrupt signing certificate
-  • Known packer stub class names in MANIFEST.MF
-"""
 from __future__ import annotations
 import hashlib
 import logging
@@ -44,56 +22,23 @@ from config.settings import(
 from models.mutation_artifact_graph import APKMetadata
 logger=logging.getLogger(__name__)
 class APKIngestionError(Exception):
-    """Raised when Stage A cannot process the provided APK."""
+    pass
 class APKIngestion:
-    """
-    Stage A: APK Ingestion and Preprocessing.
-    Usage
-    -----
-    >>> stage = APKIngestion()
-    >>> metadata, extract_dir = stage.run("/path/to/sample.apk")
-    """
     STAGE_NAME="STAGE_A"
     ZIP_MAGIC=b"PK\x03\x04"
     def __init__(self)->None:
         self._work_dir=Path(WORK_DIR)
         self._work_dir.mkdir(parents=True,exist_ok=True)
-    
-    
-    
     def run(self,apk_path:str)->tuple[APKMetadata,str]:
-        """
-        Execute Stage A.
-        Parameters
-        ----------
-        apk_path : str
-            Absolute path to the .apk file.
-        Returns
-        -------
-        metadata : APKMetadata
-            All computed metadata for the APK.
-        extract_dir : str
-            Path to the directory where the APK was extracted.
-        Raises
-        ------
-        APKIngestionError
-            If the file is invalid, too large, or corrupted beyond recovery.
-        """
         t0=time.perf_counter()
         apk_path=os.path.abspath(apk_path)
         logger.info("[Stage A] Starting ingestion: %s",apk_path)
-        
         self._validate_file(apk_path)
-        
         sha256,md5=self._compute_standard_hashes(apk_path)
         ssdeep_hash=self._compute_ssdeep(apk_path)
-        
         extract_dir=self._safe_extract(apk_path)
-        
         is_packed,packer_hint=self._detect_packer(extract_dir,apk_path)
-        
         cert_issuer,cert_subject,cert_sha256=self._parse_certificate(extract_dir)
-        
         package_name,version_name,version_code=self._read_apk_identity(apk_path)
         min_sdk,target_sdk=self._read_sdk_versions(extract_dir)
         entry_points=self._detect_entry_points(extract_dir)
@@ -121,34 +66,23 @@ class APKIngestion:
             elapsed_ms,sha256[:16],is_packed,
         )
         return metadata,extract_dir
-    
-    
-    
     def _validate_file(self,apk_path:str)->None:
-        """Ensure the file exists, has correct size, and starts with ZIP magic."""
         if not os.path.isfile(apk_path):
-            raise APKIngestionError(f"File not found: {apk_path}")
+            raise APKIngestionError(f"File not found:{apk_path}")
         size=os.path.getsize(apk_path)
         if size<APK_MIN_SIZE_BYTES:
-            raise APKIngestionError(f"APK too small ({size} bytes) — likely a stub or empty file")
+            raise APKIngestionError(f"APK too small({size}bytes)— likely a stub or empty file")
         if size>APK_MAX_SIZE_BYTES:
             raise APKIngestionError(
-                f"APK exceeds {APK_MAX_SIZE_BYTES//1024//1024} MB limit ({size} bytes)"
+                f"APK exceeds{APK_MAX_SIZE_BYTES//1024//1024}MB limit({size}bytes)"
             )
         with open(apk_path,"rb")as fh:
             magic=fh.read(4)
         if magic!=self.ZIP_MAGIC:
             raise APKIngestionError(
-                f"Not a valid APK/ZIP file — unexpected magic bytes: {magic.hex()}"
+                f"Not a valid APK/ZIP file — unexpected magic bytes:{magic.hex()}"
             )
     def _compute_standard_hashes(self,apk_path:str)->tuple[str,str]:
-        """Compute SHA-256 (integrity) and MD5 (legacy fingerprint only) of the APK binary.
-
-        NOTE: MD5 is included solely as a legacy/non-security fingerprint for
-        compatibility with older threat-intel feeds.  It must NOT be used for
-        any integrity or security decision.  All security-relevant decisions
-        use SHA-256.
-        """
         sha256_hasher=hashlib.sha256()
         md5_hasher=hashlib.md5()
         with open(apk_path,"rb")as fh:
@@ -157,15 +91,11 @@ class APKIngestion:
                 md5_hasher.update(chunk)
         return sha256_hasher.hexdigest(),md5_hasher.hexdigest()
     def _compute_ssdeep(self,apk_path:str)->str:
-        """
-        Compute SSDeep (context-triggered piecewise hash) for similarity clustering.
-        Falls back to an empty string if the ssdeep library is not installed.
-        """
         try:
             try:
-                import ssdeep # type: ignore
+                import ssdeep
             except ImportError:
-                import ppdeep as ssdeep # type: ignore
+                import ppdeep as ssdeep
             return ssdeep.hash_from_file(apk_path)
         except ImportError:
             logger.debug("[Stage A] ssdeep not available — skipping fuzzy hash")
@@ -174,21 +104,6 @@ class APKIngestion:
             logger.warning("[Stage A] SSDeep computation failed: %s",exc)
             return ""
     def _safe_extract(self,apk_path:str)->str:
-        """
-        Extract the APK (ZIP) to a working directory with full Zip Slip protection
-        and ZIP bomb defences.
-
-        Zip Slip fix: use Path.relative_to() for containment checking.
-        String prefix checks are unreliable (a sibling path with the same prefix
-        would pass).  relative_to() raises ValueError if target is outside the
-        extraction root, which we treat as a traversal attempt.
-
-        ZIP bomb defences:
-          • Max file count  (ZIP_MAX_FILE_COUNT)
-          • Max per-entry uncompressed size (ZIP_MAX_ENTRY_BYTES)
-          • Max total uncompressed size (ZIP_MAX_TOTAL_UNCOMPRESSED_BYTES)
-          • Max compression ratio per entry (ZIP_MAX_COMPRESSION_RATIO)
-        """
         apk_stem=Path(apk_path).stem
         extract_dir=self._work_dir/f"{apk_stem}_{os.urandom(4).hex()}"
         extract_dir.mkdir(parents=True,exist_ok=True)
@@ -200,21 +115,18 @@ class APKIngestion:
         try:
             with zipfile.ZipFile(apk_path,"r")as zf:
                 members=zf.infolist()
-                # -- V-004 file-count guard --
                 if len(members)>ZIP_MAX_FILE_COUNT:
                     raise APKIngestionError(
-                        f"APK contains {len(members)} entries, exceeding limit of {ZIP_MAX_FILE_COUNT}"
+                        f"APK contains{len(members)}entries,exceeding limit of{ZIP_MAX_FILE_COUNT}"
                     )
                 total_uncompressed=0
                 for member in members:
-                    # -- V-004 per-entry size guard --
                     if member.file_size>ZIP_MAX_ENTRY_BYTES:
                         logger.warning(
                             "[Stage A] ZIP entry too large (%d bytes), skipping: %s",
                             member.file_size,member.filename,
                         )
                         continue
-                    # -- V-004 compression ratio guard (ZIP bomb) --
                     if member.compress_size>0:
                         ratio=member.file_size/member.compress_size
                         if ratio>ZIP_MAX_COMPRESSION_RATIO:
@@ -223,13 +135,11 @@ class APKIngestion:
                                 ratio,member.filename,
                             )
                             continue
-                    # -- V-004 total uncompressed size guard --
                     total_uncompressed+=member.file_size
                     if total_uncompressed>ZIP_MAX_TOTAL_UNCOMPRESSED_BYTES:
                         raise APKIngestionError(
-                            f"APK total uncompressed size exceeds {ZIP_MAX_TOTAL_UNCOMPRESSED_BYTES//1024//1024} MB limit"
+                            f"APK total uncompressed size exceeds{ZIP_MAX_TOTAL_UNCOMPRESSED_BYTES//1024//1024}MB limit"
                         )
-                    # -- V-004 Zip Slip fix: use relative_to() instead of startswith() --
                     try:
                         target_path=(extract_dir_resolved/member.filename).resolve()
                         target_path.relative_to(extract_dir_resolved)
@@ -238,8 +148,7 @@ class APKIngestion:
                             "[Stage A] Zip Slip attempt blocked: %s",member.filename
                         )
                         continue
-                    # -- Reject absolute paths and drive-qualified paths --
-                    if member.filename.startswith(("/","\\")) or (len(member.filename)>1 and member.filename[1]==":"):
+                    if member.filename.startswith(("/","\\"))or(len(member.filename)>1 and member.filename[1]==":"):
                         logger.warning(
                             "[Stage A] Absolute/drive path blocked: %s",member.filename
                         )
@@ -251,18 +160,10 @@ class APKIngestion:
                         with zf.open(member)as src,open(target_path,"wb")as dst:
                             shutil.copyfileobj(src,dst)
         except zipfile.BadZipFile as exc:
-            raise APKIngestionError(f"Corrupt APK ZIP archive: {exc}")from exc
+            raise APKIngestionError(f"Corrupt APK ZIP archive:{exc}")from exc
         logger.debug("[Stage A] Extracted to: %s",extract_dir)
         return str(extract_dir)
     def _detect_packer(self,extract_dir:str,apk_path:str)->tuple[bool,str]:
-        """
-        Detect known packer / anti-analysis wrappers.
-        Heuristics:
-          1. classes.dex larger than DEX_PACKED_SIZE_THRESHOLD
-          2. Known packer stub class names in META-INF/MANIFEST.MF
-          3. Stub Application class names in AndroidManifest.xml
-        """
-        
         dex_path=os.path.join(extract_dir,"classes.dex")
         if os.path.isfile(dex_path):
             dex_size=os.path.getsize(dex_path)
@@ -271,7 +172,6 @@ class APKIngestion:
                     "[Stage A] Large classes.dex (%d MB) — possible packing",
                     dex_size//1024//1024,
                 )
-        
         manifest_path=os.path.join(extract_dir,"META-INF","MANIFEST.MF")
         if os.path.isfile(manifest_path):
             try:
@@ -282,7 +182,6 @@ class APKIngestion:
                         return True,stub
             except OSError:
                 pass
-        
         try:
             with open(apk_path,"rb")as fh:
                 raw=fh.read(512*1024)
@@ -294,11 +193,6 @@ class APKIngestion:
             pass
         return False,""
     def _parse_certificate(self,extract_dir:str)->tuple[str,str,str]:
-        """
-        Parse the APK's PKCS#7 signing certificate from META-INF/CERT.RSA (or .DSA).
-        Returns (issuer, subject, cert_sha256).
-        Returns empty strings if the certificate cannot be parsed.
-        """
         cert_issuer=cert_subject=cert_sha256=""
         meta_inf=os.path.join(extract_dir,"META-INF")
         if not os.path.isdir(meta_inf):
@@ -316,7 +210,6 @@ class APKIngestion:
             from cryptography.hazmat.backends import default_backend
             with open(cert_file,"rb")as fh:
                 raw_cert=fh.read()
-            
             certs=pkcs7.load_der_pkcs7_certificates(raw_cert)
             if certs:
                 leaf=certs[0]
@@ -329,13 +222,8 @@ class APKIngestion:
             logger.debug("[Stage A] Certificate parsing failed: %s",exc)
         return cert_issuer,cert_subject,cert_sha256
     def _read_apk_identity(self,apk_path:str)->tuple[str,str,int]:
-        """
-        Extract package name, version name, and version code from the APK.
-        Uses Androguard's APK class just for the manifest metadata.
-        Falls back to empty strings if Androguard is unavailable.
-        """
         try:
-            from androguard.core.bytecodes.apk import APK # type: ignore
+            from androguard.core.bytecodes.apk import APK
             apk=APK(apk_path)
             return(
                 apk.get_package()or "",
@@ -349,30 +237,15 @@ class APKIngestion:
             logger.warning("[Stage A] Identity extraction failed: %s",exc)
             return "","",0
     def _read_sdk_versions(self,extract_dir:str)->tuple[int,int]:
-        """
-        Read minSdkVersion and targetSdkVersion from the extracted manifest.
-        Falls back to (0, 0) on failure.
-        """
         try:
-            from androguard.core.bytecodes.apk import APK # type: ignore 
-            
-            
+            from androguard.core.bytecodes.apk import APK
             manifest_path=os.path.join(extract_dir,"AndroidManifest.xml")
             if not os.path.isfile(manifest_path):
                 return 0,0
-            
-            
             return 0,0
         except Exception:
             return 0,0
     def _detect_entry_points(self,extract_dir:str)->list[str]:
-        """
-        Detect likely Android entry points by scanning the extracted
-        AndroidManifest.xml for Activity, Service, and BroadcastReceiver tags.
-        Uses regex on the raw bytes since the manifest is still AXML-encoded
-        (binary XML) at this point — Androguard's AXMLPrinter handles it in
-        Stage C; here we do a best-effort scan for printable class name substrings.
-        """
         entry_points:list[str]=[]
         manifest_path=os.path.join(extract_dir,"AndroidManifest.xml")
         if not os.path.isfile(manifest_path):
@@ -380,13 +253,11 @@ class APKIngestion:
         try:
             with open(manifest_path,"rb")as fh:
                 raw=fh.read()
-            
             class_pattern=re.compile(
                 rb"[Lcom|Lorg|Landroid|Lio][/\w]{8,}[;]?"
             )
             for match in class_pattern.finditer(raw):
                 text=match.group(0).decode("ascii",errors="ignore")
-                # Strip control characters before storing (V-027)
                 text=re.sub(r"[\x00-\x1f\x7f-\x9f]","",text)
                 if text and text not in entry_points:
                     entry_points.append(text[:120])

@@ -1,30 +1,3 @@
-"""
-ORACLE-TMF  ·  engines/adversarial_robustness.py
-==================================================
-ADVERSARIAL ROBUSTNESS TESTING MODULE
-Evaluates the stability of the DTE XGBoost classifier under adversarial
-feature perturbation.  This directly addresses the #1 cited gap in
-2025-2026 SOTA Android malware research: adversarial robustness.
-METHODOLOGY:
-  1. Fast Gradient Sign Method (FGSM)-inspired perturbation:
-     For each artifact's feature vector x, compute perturbed vectors
-     x' = x ± ε along each feature dimension.
-  2. Stability score: percentage of classifications that remain stable
-     under ε-perturbation across all feature dimensions.
-  3. Boundary distance: minimum ε that causes a classification flip,
-     computed via binary search along each feature axis.
-OUTPUT:
-  RobustnessReport dict containing:
-    - overall_stability:    float [0,1] — fraction of stable classifications
-    - per_class_stability:  dict[DTEClass, float] — stability per class
-    - avg_boundary_distance: float — mean ε to flip a classification
-    - vulnerable_artifacts: list — artifacts that flip at ε < 0.1
-    - perturbation_matrix:  list — per-artifact perturbation results
-Research basis:
-  • Goodfellow et al. (2015) — "Explaining and Harnessing Adversarial Examples"
-  • Carlini & Wagner (2017) — "Towards Evaluating the Robustness of Neural Networks"
-  • ORACLE-TMF: "First adversarial robustness evaluation for dormancy classification"
-"""
 from __future__ import annotations
 import logging
 import time
@@ -32,21 +5,9 @@ from typing import Optional
 import numpy as np
 from models.mutation_artifact_graph import DeadCodeArtifact,DTEClass
 logger=logging.getLogger(__name__)
-
 _FEATURE_NAMES=["trigger_depth","guard_entropy","api_sensitivity","guard_indegree"]
 class AdversarialRobustnessTester:
-    """
-    Tests the DTE classifier's robustness to adversarial feature perturbation.
-    Usage
-    -----
-    >>> from engines.dte_engine import DTEEngine
-    >>> dte = DTEEngine()
-    >>> tester = AdversarialRobustnessTester(dte)
-    >>> report = tester.evaluate(artifacts)
-    """
-    
     DEFAULT_EPSILONS=[0.01,0.05,0.1,0.2,0.3,0.5,0.75,1.0]
-    
     _FEATURE_BOUNDS={
         0:(0.0,10.0),
         1:(0.0,8.0),
@@ -54,36 +15,13 @@ class AdversarialRobustnessTester:
         3:(0.0,20.0),
     }
     def __init__(self,dte_engine)->None:
-        """
-        Parameters
-        ----------
-        dte_engine : DTEEngine
-            A trained DTE engine instance (with a loaded XGBoost model).
-        """
         self._model=dte_engine._model
         self._build_features=dte_engine._build_feature_matrix
-    
-    
-    
     def evaluate(
         self,
         artifacts:list[DeadCodeArtifact],
         epsilons:Optional[list[float]]=None,
     )->dict:
-        """
-        Evaluate adversarial robustness of DTE classifications.
-        Parameters
-        ----------
-        artifacts : list[DeadCodeArtifact]
-            Classified artifacts (dte_label must be set).
-        epsilons : list[float], optional
-            Perturbation magnitudes to test. Defaults to DEFAULT_EPSILONS.
-        Returns
-        -------
-        dict — RobustnessReport with:
-            overall_stability, per_class_stability, avg_boundary_distance,
-            vulnerable_artifacts, epsilon_stability_curve, perturbation_matrix
-        """
         if not artifacts:
             return self._empty_report()
         t0=time.perf_counter()
@@ -94,7 +32,6 @@ class AdversarialRobustnessTester:
         )
         X=self._build_features(artifacts)
         original_preds=self._model.predict(X)
-        
         epsilon_stability={}
         for eps in eps_list:
             stable_count=0
@@ -103,7 +40,6 @@ class AdversarialRobustnessTester:
                     stable_count+=1
             stability=stable_count/len(X)
             epsilon_stability[eps]=round(stability,4)
-        
         perturbation_matrix=[]
         boundary_distances=[]
         vulnerable=[]
@@ -111,7 +47,6 @@ class AdversarialRobustnessTester:
             orig_class=int(original_preds[i])
             bd=self._find_boundary_distance(X[i],orig_class)
             boundary_distances.append(bd)
-            
             feature_vulnerabilities=self._per_feature_vulnerability(X[i],orig_class)
             entry={
                 "class_name":artifact.class_name,
@@ -124,7 +59,6 @@ class AdversarialRobustnessTester:
             perturbation_matrix.append(entry)
             if bd<0.1:
                 vulnerable.append(entry)
-        
         per_class_stability={}
         for dte_cls in DTEClass:
             class_indices=[
@@ -136,7 +70,6 @@ class AdversarialRobustnessTester:
                     if self._is_stable_at_epsilon(X[i],int(original_preds[i]),0.1)
                 )
                 per_class_stability[dte_cls.value]=round(stable/len(class_indices),4)
-        
         overall_stability=epsilon_stability.get(0.1,1.0)
         avg_boundary=float(np.mean(boundary_distances))if boundary_distances else 0.0
         elapsed_ms=(time.perf_counter()-t0)*1000
@@ -157,16 +90,9 @@ class AdversarialRobustnessTester:
             "vulnerable_artifacts":vulnerable[:10],
             "perturbation_matrix":perturbation_matrix[:50],
         }
-    
-    
-    
     def _is_stable_at_epsilon(
         self,x:np.ndarray,original_class:int,epsilon:float
     )->bool:
-        """
-        Check if the classification remains stable under ε-perturbation
-        along ALL feature dimensions (both + and - directions).
-        """
         for feature_idx in range(len(x)):
             lo,hi=self._FEATURE_BOUNDS.get(feature_idx,(0.0,10.0))
             for direction in[+1,-1]:
@@ -179,17 +105,9 @@ class AdversarialRobustnessTester:
                 if pred!=original_class:
                     return False
         return True
-    
-    
-    
     def _find_boundary_distance(
         self,x:np.ndarray,original_class:int,max_steps:int=20
     )->float:
-        """
-        Find the minimum ε (normalized) that causes a classification flip.
-        Uses binary search along the most sensitive feature axis.
-        Returns ε ∈ [0, 1]. Returns 1.0 if no flip found.
-        """
         min_eps=1.0
         for feature_idx in range(len(x)):
             lo_bound,hi_bound=self._FEATURE_BOUNDS.get(feature_idx,(0.0,10.0))
@@ -215,16 +133,9 @@ class AdversarialRobustnessTester:
                 if found_flip and high<min_eps:
                     min_eps=high
         return min_eps
-    
-    
-    
     def _per_feature_vulnerability(
         self,x:np.ndarray,original_class:int
     )->list[tuple[str,float]]:
-        """
-        For each feature, find the minimum ε that causes a flip.
-        Returns sorted list of (feature_name, boundary_distance) tuples.
-        """
         vulnerabilities=[]
         for feature_idx in range(len(x)):
             lo_bound,hi_bound=self._FEATURE_BOUNDS.get(feature_idx,(0.0,10.0))
@@ -254,12 +165,8 @@ class AdversarialRobustnessTester:
                 _FEATURE_NAMES[feature_idx],
                 round(min_eps_feature,4),
             ))
-        
         vulnerabilities.sort(key=lambda x:x[1])
         return vulnerabilities
-    
-    
-    
     @staticmethod
     def _empty_report()->dict:
         return{

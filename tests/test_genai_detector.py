@@ -1,25 +1,9 @@
-"""
-ORACLE-TMF  ·  tests/test_genai_detector.py
-=============================================
-Unit tests for the GenAI API Scaffold Detector (Class 7 / TMF-Psi).
-Tests cover:
-  • Provider detection accuracy for all 9 tracked providers
-  • Endpoint string classification
-  • Model name string classification
-  • API key pattern matching (Gemini, OpenAI, Anthropic, Groq, HuggingFace)
-  • Dead code Smali scanning for obfuscated references
-  • LLM message schema pattern matching
-  • Empty / edge-case handling
-  • Deduplication across passes
-Does NOT require Androguard — tests use mock objects and direct method calls.
-"""
 from __future__ import annotations
 import re
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock
 import pytest
-
 PROJECT_ROOT=str(Path(__file__).resolve().parents[1])
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0,PROJECT_ROOT)
@@ -29,19 +13,14 @@ from engines.genai_scaffold_detector import(
     _LLM_MSG_PATTERNS,
 )
 from models.mutation_artifact_graph import DeadCodeArtifact,DTEClass
-
-
-
 @pytest.fixture(scope="module")
 def detector():
-    """Shared detector instance."""
     return GenAIScaffoldDetector()
 def _make_dead_code(
     smali:str="",
     class_name:str="Lcom/malware/GenAIHelper;",
     method_name:str="callLLM()V",
 )->DeadCodeArtifact:
-    """Factory for dead code artifacts with given Smali body."""
     return DeadCodeArtifact(
         class_name=class_name,
         method_name=method_name,
@@ -50,34 +29,26 @@ def _make_dead_code(
         dte_label=DTEClass.SCAFFOLDING,
         dte_confidence=0.85,
     )
-
-
-
 class TestProviderMap:
-    """Validate the GENAI_PROVIDER_MAP is well-structured."""
     def test_all_providers_have_endpoints(self):
         for provider,data in GENAI_PROVIDER_MAP.items():
-            assert "endpoints"in data,f"{provider} missing 'endpoints'"
-            assert len(data["endpoints"])>0,f"{provider} has empty endpoints"
+            assert "endpoints"in data,f"{provider}missing 'endpoints'"
+            assert len(data["endpoints"])>0,f"{provider}has empty endpoints"
     def test_all_providers_have_models(self):
         for provider,data in GENAI_PROVIDER_MAP.items():
-            assert "models"in data,f"{provider} missing 'models'"
-            assert len(data["models"])>0,f"{provider} has empty models"
+            assert "models"in data,f"{provider}missing 'models'"
+            assert len(data["models"])>0,f"{provider}has empty models"
     def test_key_pattern_is_regex_or_none(self):
         for provider,data in GENAI_PROVIDER_MAP.items():
             pattern=data.get("key_pattern")
             assert pattern is None or isinstance(pattern,re.Pattern),(
-                f"{provider} key_pattern is not a regex or None"
+                f"{provider}key_pattern is not a regex or None"
             )
     def test_expected_providers_present(self):
         expected={"Gemini","OpenAI","Anthropic","Ollama","Mistral"}
         actual=set(GENAI_PROVIDER_MAP.keys())
-        assert expected.issubset(actual),f"Missing providers: {expected-actual}"
-
-
-
+        assert expected.issubset(actual),f"Missing providers:{expected-actual}"
 class TestStringClassification:
-    """Test _classify_string() for endpoint, model, and API key detection."""
     def test_gemini_endpoint(self,detector):
         provider,kind=detector._classify_string(
             "generativelanguage.googleapis.com/v1beta/models/gemini-pro:generatecontent",
@@ -135,18 +106,14 @@ class TestStringClassification:
         provider,kind=detector._classify_string(fake_key.lower(),fake_key)
         assert provider=="Anthropic"
         assert kind=="api_key"
-
-
-
 class TestDeadCodeSmaliScan:
-    """Test _scan_dead_code_smali() — Pass 2."""
     def test_detect_gemini_in_smali(self,detector):
-        fake_key = "AIza" + "SyFakeKeyNotReal1234567890123456789"
+        fake_key="AIza"+"SyFakeKeyNotReal1234567890123456789"
         smali='''
 .method public callGemini()V
     .locals 2
     const-string v0, "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent"
-    const-string v1, "''' + fake_key + '''"
+    const-string v1, "'''+fake_key+'''"
     invoke-virtual {v0, v1}, Ljava/lang/String;->concat(Ljava/lang/String;)Ljava/lang/String;
     return-void
 .end method
@@ -185,7 +152,6 @@ class TestDeadCodeSmaliScan:
         artifacts=detector._scan_dead_code_smali(dead)
         assert len(artifacts)==0
     def test_dedup_per_method(self,detector):
-        """Multiple GenAI strings in the same method should yield only 1 artifact."""
         smali='''
 .method public dualLLM()V
     .locals 2
@@ -196,13 +162,8 @@ class TestDeadCodeSmaliScan:
 '''
         dead=[_make_dead_code(smali=smali)]
         artifacts=detector._scan_dead_code_smali(dead)
-        
         assert len(artifacts)==1
-
-
-
 class TestLLMSchemaPatterns:
-    """Test the regex patterns that detect structured LLM prompting code."""
     def test_role_user_pattern(self):
         text='{"role": "user", "content": "What is 2+2?"}'
         assert any(p.search(text)for p in _LLM_MSG_PATTERNS)
@@ -218,11 +179,7 @@ class TestLLMSchemaPatterns:
     def test_no_false_positive_on_normal_json(self):
         text='{"name": "John", "age": 30}'
         assert not any(p.search(text)for p in _LLM_MSG_PATTERNS)
-
-
-
 class TestDetailExtraction:
-    """Test _extract_genai_details() for URL and model hint extraction."""
     def test_extract_url_from_smali(self):
         smali='const-string v0, "https://api.openai.com/v1/chat/completions"'
         endpoint,model=GenAIScaffoldDetector._extract_genai_details(

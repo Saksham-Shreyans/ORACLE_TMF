@@ -1,166 +1,254 @@
-# 🔮 ORACLE-TMF (Temporal Mutation Forecaster)
+﻿# ORACLE-TMF
 
-Observational Reasoning and Coercive Analysis for Latent Evolution.
+Observational Reasoning and Coercive Analysis for Latent Evolution - Temporal Mutation Forecaster.
 
-**ORACLE-TMF** is an advanced malware analysis pipeline and forecasting engine designed to extract mutation artifacts from Android APKs and predict their next evolutionary steps. By treating malware as an evolving biological organism, ORACLE-TMF extracts "dormant" DNA and structural scaffolding to predict what features the malware authors will weaponize in their next release.
+ORACLE-TMF is a defensive Android malware analysis and mutation-forecasting platform. It extracts dormant implementation signals from APKs, converts them into a canonical Mutation Artifact Graph (MAG), reasons over those signals, scores next-version forecasts, and exports actionable intelligence for analysts, SOC teams, and research workflows.
+
+The project is built around one core idea: malware often contains evidence of what it will become before the next version is released. Dead code, unused permissions, inactive C2 clients, partial APIs, unfinished UI flows, placeholder strings, and GenAI scaffolds can reveal the attacker workflow, planned capability, and likely next development step.
+
+Safety scope: ORACLE-TMF is intended for malware analysis, threat intelligence, detection engineering, and defensive research. Lab-only modules such as PHANTOM and OUROBOROS should be used only in controlled, isolated environments.
 
 ---
 
-## 🏗️ Architecture Flowchart
+## Table of Contents
 
-The ORACLE-TMF pipeline is divided into two primary stages: **Stage 1 (Artifact Extraction & Forecasting)** and **Stage 2 (Advanced Intelligence Engines)**.
+- [High-Level Capabilities](#high-level-capabilities)
+- [Architecture Flowchart](#architecture-flowchart)
+- [Repository Layout](#repository-layout)
+- [Core Data Model: Mutation Artifact Graph](#core-data-model-mutation-artifact-graph)
+- [Stage 1 Pipeline: Static Extraction and Forecasting](#stage-1-pipeline-static-extraction-and-forecasting)
+- [Stage 2 Pipeline: Advanced Intelligence Engines](#stage-2-pipeline-advanced-intelligence-engines)
+- [Research Readiness and Paper Drafting](#research-readiness-and-paper-drafting)
+- [Outputs and Intelligence Products](#outputs-and-intelligence-products)
+- [Dashboard Usage](#dashboard-usage)
+- [REST API Usage](#rest-api-usage)
+- [Python API Usage](#python-api-usage)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Testing](#testing)
+- [Security and Safety Model](#security-and-safety-model)
+- [Troubleshooting](#troubleshooting)
+- [Development Notes](#development-notes)
+- [Disclaimer](#disclaimer)
+
+---
+
+## High-Level Capabilities
+
+ORACLE-TMF combines static APK inspection, graph-style artifact modeling, optional LLM reasoning, Bayesian scoring, and Stage 2 research engines.
+
+Primary capabilities:
+
+- APK metadata extraction: package name, versions, hashes, certificates, SDK levels, entry points, packer hints, and file size.
+- DEX and CFG analysis: extracts Android bytecode structure through Androguard and graph traversal.
+- Seven-class mutation artifact taxonomy: dead code, unused permissions, placeholder strings, C2 stubs, partial APIs, unfinished UI flows, and GenAI scaffolds.
+- Dormancy Taxonomy Engine (DTE): classifies unreachable code into labels such as `REMNANT`, `SCAFFOLDING`, `LOGIC_BOMB`, and `ENCRYPTED_DROPPER`.
+- TMF-REFLECT: augments control-flow reachability with reflection and dynamic loading chains.
+- Multi-agent LLM reasoning: decompilation, hypothesis generation, and skeptical validation.
+- RAG grounding: optional ChromaDB and sentence-transformers retrieval over MITRE ATT&CK Mobile and malware-family context.
+- Bayesian scoring: fuses LLM probability, artifact density, mutation velocity, and historical prior.
+- Stage 2 intelligence: NAV, PHANTOM, CABAL, KINSHIP, MIRAGE, OUROBOROS, synthetic variants, and network attack detection.
+- Research-readiness scoring: converts analysis output into evidence matrices, limitations, reproducibility checks, and paper-ready summaries.
+- Export pack: JSON, YARA, STIX 2.1, PDF brief, and Markdown research paper draft.
+- Streamlit dashboard: analyst-facing interactive UI.
+- FastAPI service: authenticated upload and result retrieval API with safe defaults.
+
+---
+
+## Architecture Flowchart
+
+The platform has three main entry points: the Streamlit dashboard, the FastAPI service, and direct Python orchestration. All entry points feed the same Stage 1 orchestrator and optionally the Stage 2 orchestrator.
 
 ```mermaid
 flowchart TD
-    %% Define Styles
-    classDef input fill:#2c3e50,stroke:#34495e,stroke-width:2px,color:#fff
-    classDef stage1 fill:#3498db,stroke:#2980b9,stroke-width:2px,color:#fff
-    classDef stage2 fill:#9b59b6,stroke:#8e44ad,stroke-width:2px,color:#fff
-    classDef output fill:#27ae60,stroke:#2ecc71,stroke-width:2px,color:#fff
-    
-    A["Input APKs (v_n, v_n-1)"]:::input --> B["Stage 1: Disassembly & TMF-REFLECT"]:::stage1
-    B --> C["Stage 1: Manifest & Permissions"]:::stage1
-    B --> D["Stage 1: Dead Code Analysis"]:::stage1
-    D --> DTE["Dormancy Taxonomy Classification"]:::stage1
-    B --> F["Stage 1: Strings & Assets"]:::stage1
-    B --> G["Stage 1: C2 Endpoints"]:::stage1
-    B --> H["Stage 1: Partial APIs"]:::stage1
-    B --> GENAI["Stage 1: GenAI Scaffolds"]:::stage1
-    
-    C & DTE & F & G & H & GENAI --> MAG["Mutation Artifact Graph (MAG)"]:::stage1
-    MAG --> J["Stage 1: LLM Reasoning"]:::stage1
-    J --> K["Stage 1: Bayesian Scoring"]:::stage1
-    
-    K --> STAGE2{"Stage 2 Engines"}:::stage2
-    
-    STAGE2 --> M["Stage M: PHANTOM Detonation"]:::stage2
-    STAGE2 --> N["Stage N: NAV Analysis"]:::stage2
-    STAGE2 --> O["Stage O: CABAL Collusion"]:::stage2
-    STAGE2 --> P["Stage P: KINSHIP Fingerprint"]:::stage2
-    STAGE2 --> Q["Stage Q: MIRAGE Robustness"]:::stage2
-    STAGE2 --> NET["Network Attack Analyzer"]:::stage2
-    
-    M & N & O & P & Q & NET --> R["Stage R: OUROBOROS Co-evolution"]:::stage2
-    
-    R --> REP["Intelligence Report Generation"]:::output
-    REP --> JSON["JSON / PDF Report"]:::output
-    REP --> STIX["STIX 2.1 Bundle"]:::output
-    REP --> YARA["YARA Signatures"]:::output
+    subgraph Entry["Entry Points"]
+        UI["Streamlit dashboard<br/>app.py"]
+        API["FastAPI service<br/>api.py"]
+        PY["Python integration<br/>ORACLETMFOrchestrator"]
+    end
+
+    UI --> ORCH
+    API --> ORCH
+    PY --> ORCH
+
+    ORCH["Stage 1 Orchestrator<br/>orchestrator.py"]
+
+    subgraph Stage1["Stage 1: Static Extraction and Forecasting"]
+        A["Stage A<br/>APK ingestion"]
+        B["Stage B<br/>DEX disassembly"]
+        REFLECT["TMF-REFLECT<br/>reflection reachability"]
+        C["Stage C<br/>manifest parser"]
+        D["Stage D<br/>dead-code detector"]
+        DTE["DTE Engine<br/>dormancy taxonomy"]
+        E["Stage E<br/>unused permissions"]
+        F["Stage F<br/>string mining"]
+        G["Stage G<br/>C2 stub detector"]
+        H["Stage H<br/>partial API detector"]
+        GENAI["GenAI scaffold detector"]
+        UIX["Unfinished UI detector"]
+        TARGET["Targeting intelligence"]
+        I["Stage I<br/>version diff and MVV"]
+        J["Stage J<br/>LLM reasoning"]
+        K["Stage K<br/>Bayesian scorer"]
+        L["Stage L<br/>report synthesizer"]
+    end
+
+    ORCH --> A --> B --> REFLECT --> C --> D --> DTE
+    DTE --> MAG
+    C --> MAG
+    E --> MAG
+    F --> MAG
+    G --> MAG
+    H --> MAG
+    GENAI --> MAG
+    UIX --> MAG
+    TARGET --> MAG
+    I --> MAG
+    MAG["Mutation Artifact Graph<br/>models/mutation_artifact_graph.py"]
+    MAG --> J --> K --> L
+
+    subgraph Stage2["Stage 2: Optional Advanced Intelligence"]
+        S2["Stage 2 Orchestrator<br/>orchestrator_stage2.py"]
+        M["Stage M<br/>PHANTOM detonation"]
+        N["Stage N<br/>NAV analysis"]
+        O["Stage O<br/>CABAL collusion"]
+        P["Stage P<br/>KINSHIP fingerprinting"]
+        Q["Stage Q<br/>MIRAGE robustness"]
+        R["Stage R<br/>OUROBOROS co-evolution"]
+        NET["Network attack analyzer"]
+        SYN["Synthetic variant generator"]
+    end
+
+    K --> S2
+    MAG --> S2
+    S2 --> M
+    S2 --> N
+    S2 --> O
+    S2 --> P
+    S2 --> Q
+    S2 --> R
+    S2 --> NET
+    S2 --> SYN
+
+    S2 --> RR
+    L --> OUT
+    RR["Research readiness engine<br/>engines/research_readiness.py"] --> OUT
+
+    subgraph Outputs["Outputs"]
+        OUT["Intelligence products"]
+        JSON["JSON MAG report"]
+        YARA["Proactive YARA rules"]
+        STIX["STIX 2.1 bundle"]
+        PDF["PDF intelligence brief"]
+        PAPER["Markdown research paper draft"]
+        APIRES["API summaries"]
+    end
+
+    OUT --> JSON
+    OUT --> YARA
+    OUT --> STIX
+    OUT --> PDF
+    OUT --> PAPER
+    OUT --> APIRES
+```
+
+Stage 1 builds evidence. Stage 2 enriches it. Stage L and the research-readiness engine turn it into consumable intelligence.
+
+---
+
+## Repository Layout
+
+```text
+.
+|-- app.py                              Streamlit analyst dashboard
+|-- api.py                              FastAPI service with auth, rate limits, TTL result cache
+|-- orchestrator.py                     Main Stage 1 orchestration path
+|-- orchestrator_stage2.py              Optional Stage 2 orchestration path
+|-- security.py                         Upload validation, API key checks, sanitization helpers
+|-- requirements.txt                    Runtime, dashboard, API, Stage 2, and test dependencies
+|-- STAGE2_INTEGRATION.md               Stage 2 integration notes
+|-- config/
+|   |-- settings.py                     Stage 1 constants, thresholds, API settings
+|   `-- stage2_settings.py              Stage 2 constants and lab-module defaults
+|-- data/
+|   `-- knowledge_base/                 MITRE, malware-family, and targeting taxonomy data
+|-- engines/
+|   |-- dte_engine.py                   Dormancy Taxonomy Engine
+|   |-- tmf_reflect.py                  Reflection-aware CFG augmentation
+|   |-- genai_scaffold_detector.py      GenAI/LLM API scaffold detector
+|   |-- unfinished_ui_detector.py       Orphaned layout and UI-flow detector
+|   |-- targeting_intelligence.py       Institution and region targeting hints
+|   |-- research_readiness.py           Publication and evidence-quality scoring
+|   `-- nav/nav_engine.py               Negative Artifact Vector engine
+|-- models/
+|   |-- mutation_artifact_graph.py      Canonical MAG dataclasses
+|   `-- nav_models.py                   NAV event and history models
+|-- phantom/                            PHANTOM dynamic/deception components
+|   |-- deception_engine.py
+|   |-- device_persona.py
+|   |-- honeytoken_generator.py
+|   |-- sensory_emulation.py
+|   |-- behavioral_biometrics.py
+|   `-- frida_bypass/
+|-- pipeline/
+|   |-- stage_a_ingestion.py            APK hashing, metadata, extraction
+|   |-- stage_b_dex_disassembly.py      Androguard DEX analysis
+|   |-- stage_c_manifest_parser.py      Manifest parsing
+|   |-- stage_d_dead_code.py            Unreachable code discovery
+|   |-- stage_e_unused_perms.py         Permission/API mismatch analysis
+|   |-- stage_f_string_mining.py        Placeholder, entropy, URL, crypto, and marker mining
+|   |-- stage_g_c2_stubs.py             Dormant network client extraction
+|   |-- stage_h_partial_apis.py         Incomplete sensitive API implementation detection
+|   |-- stage_i_version_diff.py         Version delta and mutation velocity vector
+|   |-- stage_j_llm_reasoning.py        Three-agent LLM reasoning chain
+|   |-- stage_k_bayesian_scorer.py      Confidence scoring and gating
+|   |-- stage_l_report_synthesizer.py   JSON, YARA, STIX, PDF, and paper output
+|   `-- stage2/                         Stage M-R wrappers
+|-- research/
+|   |-- cabal/                          Cross-app collusion analysis
+|   |-- kinship/                        Builder DNA fingerprinting
+|   |-- mirage/                         Adversarial robustness analysis
+|   |-- network_attack/                 DDoS, DGA, and network signature detection
+|   |-- ouroboros/                      Co-evolution and prompt refinement loop
+|   `-- synthetic_variant/              Synthetic v(n+1) variant fixtures
+`-- tests/                              Unit and contract tests
 ```
 
 ---
 
-## 🔬 Core Capabilities (Stage 1)
+## Core Data Model: Mutation Artifact Graph
 
-ORACLE-TMF employs a 12-stage pipeline to dissect Android applications and extract subtle artifacts across a **7-Class Taxonomy**:
+The Mutation Artifact Graph (MAG) is the canonical object passed between stages. It is defined in `models/mutation_artifact_graph.py`.
 
-1. **Dead Code & Unreachable Methods (DTE Engine)**
-   - Extracts unexecuted Smali paths and classifies them via the Dormancy Taxonomy Classification (DTE) engine using an XGBoost model.
-   - Differentiates between benign remnants, developer scaffolding, and malicious logic bombs.
-2. **Unused Permission Intents**
-   - Identifies permissions requested in the `AndroidManifest.xml` that are never called by the application’s components, revealing future capability aspirations.
-3. **Placeholder Strings & Resources**
-   - Mines the APK for high-entropy or anomalous placeholder strings (e.g., `TODO`, `STAGING_URL`, internal IP ranges) often left behind during malware development.
-4. **C2 Endpoint Stubs**
-   - Extracts orphaned or inactive Command & Control (C2) endpoints, including Tor `.onion` addresses and raw IPv4s.
-5. **Partial API Implementations**
-   - Detects incomplete API interfaces that hint at future data exfiltration or device control capabilities.
-6. **Unfinished UI Flows**
-   - Spots orphaned UI layouts and XML resources (e.g., hidden banking phishing screens or overlay attacks).
-7. **GenAI API Scaffolds (TMF-Psi)**
-   - Detects AI-augmented malware scaffolds, indicating the use of Generative AI tools (e.g., OpenAI, Anthropic, Gemini) by malware authors for dynamic payload generation.
+A MAG stores:
 
----
+- `apk_metadata`: hashes, package metadata, version info, certificate metadata, SDK levels, entry points, packer hints.
+- `dead_code`: unreachable method artifacts found by Stage D and labeled by DTE.
+- `unused_permissions`: permissions requested in the manifest but not matched to expected runtime API usage.
+- `placeholder_strings`: staging markers, TODO/FIXME strings, local URLs, internal IPs, high-entropy strings, crypto addresses, and similar development leftovers.
+- `c2_stubs`: inactive or orphaned command-and-control plumbing.
+- `partial_apis`: incomplete implementations of sensitive framework classes.
+- `unfinished_ui_flows`: orphaned layouts, dormant screens, phishing-like layouts, and unreferenced UI assets.
+- `genai_scaffolds`: references to GenAI providers, model hints, and API endpoints.
+- `manifest`: parsed manifest fields and targeting extensions.
+- `version_delta`: artifact additions/removals and Mutation Velocity Vector (MVV) when a previous APK is supplied.
+- `forecasts`: next-version mutation forecasts generated by Stage J and scored by Stage K.
+- `stage2_intelligence`: stable Stage 2 summary used by the UI, API, reports, and paper drafts.
+- `research_readiness`: evidence-quality and publication-readiness report.
+- `stage_errors`: per-stage error capture so one failed stage does not destroy the whole analysis.
+- `stage_timings_ms`: per-stage timing telemetry.
 
-## 🧠 Advanced Intelligence Engines (Stage 2)
+The MAG can be serialized with:
 
-ORACLE-TMF’s Stage 2 pipeline introduces deep research engines designed to attack, fingerprint, and trace the malware's evolution.
-
-### 📉 Negative Artifact Vectors (NAV)
-Analyzes "dropped" or removed artifacts between version $v_{n-1}$ and $v_n$. By observing what malware authors remove, NAV detects tactical shifts, evasion strategies, and abandoned development branches.
-
-### 🧬 KINSHIP Fingerprinting (Builder DNA)
-Extracts morphological traits (OpCode frequencies, structural patterns) to construct a "Builder DNA Vector" (BDV). KINSHIP calculates cosine similarity against a database of known Threat Actor profiles to cluster malware samples by their origin.
-
-### 🛡️ MIRAGE Robustness Evaluation
-A red-teaming capability that scores the robustness of the ORACLE-TMF pipeline itself. MIRAGE simulates adversarial perturbations against the extracted artifacts and evaluates the injection costs required for an attacker to bypass the system.
-
-### 🕸️ CABAL Collusion Engine
-An opt-in engine that detects multi-APK collusion. CABAL analyzes communication bridges (e.g., shared intents, content providers, SMS bridges) to construct cross-app artifact graphs, revealing syndicates of collaborating applications.
-
-### 👻 PHANTOM Detonation Engine
-An active deception engine for safe, simulated malware detonation. PHANTOM creates a hyper-realistic, stateful Android environment using Frida. It generates mathematically valid device personas (Luhn-compliant IMEIs, realistic sensor noise, and behavioral biometrics like typing cadence) to defeat anti-analysis and sandbox-evasion checks.
-
-### 🌐 Network Attack Analyzer
-Detects advanced network-layer threats embedded within the application, such as Domain Generation Algorithms (DGA), DDoS attack vectors (e.g., SYN floods), and botnet clustering. It outputs Suricata rules and STIX indicators for immediate deployment to firewalls.
-
-### 🐍 OUROBOROS Co-evolution Loop
-An advanced research module designed for continuous co-evolutionary refinement. OUROBOROS trains the forecasting models using historical feedback, allowing ORACLE-TMF to adapt alongside the malware authors.
-
----
-
-## 🎯 Evolutionary Mutation Forecasts
-
-Instead of just telling you what the malware *does*, ORACLE-TMF tells you what it will do *next*.
-
-- **Evolutionary Timeline**: Visualizes the historical ($v_{n-1}$), current ($v_n$), and predicted next version ($v_{n+1}$) of the malware.
-- **Bayesian Confidence Scoring**: Computes a strict confidence score for each prediction. By combining LLM-derived probabilities, artifact density across the MAG (Mutation Artifact Graph), and empirical prior weights, the Bayesian scorer filters out low-confidence hallucinations and promotes highly probable evolutionary jumps.
-
----
-
-## 📤 Export & Integration
-
-ORACLE-TMF seamlessly exports its intelligence products for SOC and Threat Intel integration:
-- **Comprehensive JSON Report**: The full Mutation Artifact Graph (MAG) and executive summary.
-- **Proactive YARA Rules**: Signatures generated not for the current malware, but for the predicted $v_{n+1}$ payload.
-- **STIX 2.1 Bundle**: A TAXII-compatible threat intelligence feed containing actionable indicators (C2 IPs, domains, hashes).
-- **PDF Intelligence Brief**: A beautifully formatted, human-readable report for C-suite and SOC analysts.
-
----
-
-## 🚀 Setup and Usage
-
-### Prerequisites
-- Python 3.10+
-- `apktool` (Ensure it is installed and available in your system `PATH`)
-- `java` (Required for apktool)
-
-### Installation
-
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/Saksham-Shreyans/ORACLE_TMF.git
-   cd ORACLE_TMF
-   ```
-
-2. **Install dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. **Configure API Keys (Optional but Recommended):**
-   ORACLE-TMF relies on LLMs for reasoning. Set your API keys in `.env` or as environment variables:
-   ```env
-   OPENAI_API_KEY=your_key_here
-   ANTHROPIC_API_KEY=your_key_here
-   GEMINI_API_KEY=your_key_here
-   ```
-
-### Running the Dashboard
-
-Launch the interactive Streamlit dashboard:
-```bash
-streamlit run app.py
+```python
+mag.to_dict()
+mag.to_json()
 ```
 
-### Analysis Workflow
+It can also be reconstructed from saved JSON:
 
-1. **Upload Targets**: Open the web interface and upload the **Target APK** ($v_n$).
-2. **Version Diffing**: *(Optional)* Upload the **Previous Version APK** ($v_{n-1}$) to enable NAV drop detection and evolutionary diffing.
-3. **Configure Stage 2**: Use the sidebar to toggle specific Stage 2 modules (KINSHIP, MIRAGE, PHANTOM, etc.).
-4. **Execute**: Run the analysis and view the generated intelligence products directly in the browser.
+```python
+from models.mutation_artifact_graph import MutationArtifactGraph
 
----
-
-## 🛡️ License and Disclaimer
-ORACLE-TMF is designed for security research, threat intelligence, and defensive purposes. Use responsibly.
+mag = MutationArtifactGraph.from_dict(saved_report["full_mag"])
+```

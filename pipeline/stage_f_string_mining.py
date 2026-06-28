@@ -41,13 +41,10 @@ from config.settings import(
 from models.mutation_artifact_graph import PlaceholderStringArtifact
 from security import safe_xml_parse
 logger=logging.getLogger(__name__)
-
 _COMPILED_PATTERNS:dict[str,re.Pattern]={
     name:re.compile(pattern,re.IGNORECASE)
     for name,pattern in PLACEHOLDER_PATTERNS.items()
 }
-
-
 _BENIGN_PREFIXES:tuple[str,...]=(
     "AAAAgASU",
     "com.google.",
@@ -65,9 +62,6 @@ class StringMiner:
     >>> strings = stage.run(apk_path, extract_dir, analysis)
     """
     STAGE_NAME="STAGE_F"
-    
-    
-    
     def run(
         self,apk_path:str,extract_dir:str,analysis:Any
     )->list[PlaceholderStringArtifact]:
@@ -85,13 +79,10 @@ class StringMiner:
         t0=time.perf_counter()
         logger.info("[Stage F] Starting string resource and placeholder mining")
         artifacts:list[PlaceholderStringArtifact]=[]
-        
         dex_artifacts=self._mine_dex_string_pool(analysis)
         artifacts.extend(dex_artifacts)
-        
         res_artifacts=self._mine_resource_strings(extract_dir)
         artifacts.extend(res_artifacts)
-        
         seen:set[str]=set()
         unique:list[PlaceholderStringArtifact]=[]
         for a in artifacts:
@@ -104,17 +95,12 @@ class StringMiner:
             elapsed_ms,len(dex_artifacts),len(res_artifacts),len(unique),
         )
         return unique
-    
-    
-    
     def _mine_dex_string_pool(self,analysis:Any)->list[PlaceholderStringArtifact]:
         """Scan every string constant in the DEX global string pool."""
         artifacts:list[PlaceholderStringArtifact]=[]
         try:
-            
             for string_analysis in analysis.get_strings():
                 value=str(string_analysis.get_value())
-                
                 if len(value)<STRING_MIN_LENGTH:
                     continue
                 if any(value.startswith(prefix)for prefix in _BENIGN_PREFIXES):
@@ -125,9 +111,6 @@ class StringMiner:
         except Exception as exc:
             logger.warning("[Stage F] DEX string pool mining error: %s",exc)
         return artifacts
-    
-    
-    
     def _mine_resource_strings(self,extract_dir:str)->list[PlaceholderStringArtifact]:
         """Parse res/values/strings.xml and flag suspicious entries."""
         artifacts:list[PlaceholderStringArtifact]=[]
@@ -154,9 +137,6 @@ class StringMiner:
         except Exception as exc:
             logger.debug("[Stage F] strings.xml parse/mining error: %s",exc)
         return artifacts
-    
-    
-    
     def _evaluate_string(
         self,value:str,source:str,key_name:str=""
     )->PlaceholderStringArtifact|None:
@@ -166,14 +146,11 @@ class StringMiner:
         """
         entropy=self._shannon_entropy(value)
         matched_pattern=""
-        
         is_high_entropy=entropy>=STRING_HIGH_ENTROPY_THRESHOLD
-        
         for pattern_name,compiled_re in _COMPILED_PATTERNS.items():
             if compiled_re.search(value):
                 matched_pattern=pattern_name
                 break
-        
         if is_high_entropy or matched_pattern:
             return PlaceholderStringArtifact(
                 value=value[:256],
@@ -183,9 +160,6 @@ class StringMiner:
                 key_name=key_name,
             )
         return None
-    
-    
-    
     @staticmethod
     def _shannon_entropy(text:str)->float:
         """
@@ -203,5 +177,3 @@ class StringMiner:
             freq[char]=freq.get(char,0)+1
         total=len(text)
         return-sum((c/total)*math.log2(c/total)for c in freq.values())
-
-

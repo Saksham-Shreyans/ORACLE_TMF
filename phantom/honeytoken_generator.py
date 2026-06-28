@@ -1,122 +1,53 @@
-"""
-ORACLE-TMF  ·  phantom/honeytoken_generator.py
-================================================
-PHANTOM Polymorphic Honeytoken Adaptation (PHA) — Stage 2 Tier 2.
-
-Generates per-session synthetic financial artifacts for the PHANTOM
-deception engine.  All data is exclusively honeytokens — genuine credentials
-are never present in the detonation environment.  All tokens are bound to
-a localhost proxy so any exfiltration attempt is captured, not leaked.
-
-Per-session artifacts generated:
-  ┌────────────────────────────────────────────────────────────────────┐
-  │  SMS History       │ Synthetic banking alert SMSes (SBI/HDFC/ICICI) │
-  │  UPI Credentials   │ Honeytoken VPA, MPIN, device binding           │
-  │  Net-banking creds │ Honeytoken customer ID, password, OTP          │
-  │  Bank Account      │ Synthetic IFSC, account number, balance         │
-  │  Credit/Debit Card │ Luhn-valid card, CVV, expiry                    │
-  └────────────────────────────────────────────────────────────────────┘
-
-SAFETY BOUNDARY
---------------
-All honeytokens are generated with a recognisable internal prefix
-("ORACLE_PHA_") that allows the orchestrator to identify any data
-exfiltrated by the malware and confirm it is synthetic, not real.
-No real financial data enters the PHANTOM detonation environment.
-"""
 from __future__ import annotations
-
 import hashlib
 import logging
 import math
 import random
 import string
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass,field
 from typing import Optional
-
 from config.stage2_settings import PHANTOM_SMS_TEMPLATES
 from phantom.device_persona import AndroidPersona
-
-logger = logging.getLogger(__name__)
-
-# Internal marker to flag synthetic honeytokens
-_HONEYTOKEN_MARKER = "ORACLE_PHA"
-
-
+logger=logging.getLogger(__name__)
+_HONEYTOKEN_MARKER="ORACLE_PHA"
 @dataclass
 class BankAccount:
-    """Synthetic Indian bank account (honeytoken)."""
-
-    bank_name: str = ""
-    ifsc_code: str = ""
-    account_number: str = ""
-    account_holder: str = ""
-    balance_inr: float = 0.0
-    upi_vpa: str = ""           # Virtual Payment Address (UPI ID)
-    upi_mpin: str = ""          # 4-6 digit MPIN (honeytoken)
-    net_banking_id: str = ""    # Customer/IPIN ID
-    net_banking_pass: str = ""  # Honeytoken password
-    session_token: str = ""     # Honeytoken session token
-
-
+    bank_name:str=""
+    ifsc_code:str=""
+    account_number:str=""
+    account_holder:str=""
+    balance_inr:float=0.0
+    upi_vpa:str=""
+    upi_mpin:str=""
+    net_banking_id:str=""
+    net_banking_pass:str=""
+    session_token:str=""
 @dataclass
 class PaymentCard:
-    """Synthetic Luhn-valid payment card (honeytoken)."""
-
-    card_number: str = ""       # Luhn-valid 16-digit (honeytoken)
-    card_holder: str = ""
-    expiry_month: int = 0
-    expiry_year: int = 0
-    cvv: str = ""               # 3-digit CVV (honeytoken)
-    card_type: str = ""         # VISA / MASTERCARD / RUPAY
-    bank_name: str = ""
-    last_four: str = ""
-
-
+    card_number:str=""
+    card_holder:str=""
+    expiry_month:int=0
+    expiry_year:int=0
+    cvv:str=""
+    card_type:str=""
+    bank_name:str=""
+    last_four:str=""
 @dataclass
 class PhantomHoneytokenBundle:
-    """
-    Complete per-session honeytoken bundle for a PHANTOM detonation.
-
-    All fields are synthetic and marked with internal prefixes.
-    Bound to a localhost capture proxy to intercept exfiltration.
-    """
-
-    session_id: str = ""
-    persona_model: str = ""
-    created_at: float = 0.0
-
-    # Financial artifacts
-    primary_account: BankAccount = field(default_factory=BankAccount)
-    secondary_account: BankAccount = field(default_factory=BankAccount)
-    primary_card: PaymentCard = field(default_factory=PaymentCard)
-
-    # SMS history (pre-seeded as contact "bank" messages)
-    synthetic_sms: list[dict] = field(default_factory=list)
-
-    # Active OTP (will be exfiltrated if SMS hijack is attempted)
-    active_otp: str = ""
-    otp_issued_at: float = 0.0
-    otp_target_bank: str = ""
-
-    # Capture proxy endpoint (all outbound honeytoken exfiltration routes here)
-    capture_proxy_url: str = "http://127.0.0.1:8899/capture"
-
-
+    session_id:str=""
+    persona_model:str=""
+    created_at:float=0.0
+    primary_account:BankAccount=field(default_factory=BankAccount)
+    secondary_account:BankAccount=field(default_factory=BankAccount)
+    primary_card:PaymentCard=field(default_factory=PaymentCard)
+    synthetic_sms:list[dict]=field(default_factory=list)
+    active_otp:str=""
+    otp_issued_at:float=0.0
+    otp_target_bank:str=""
+    capture_proxy_url:str="http://127.0.0.1:8899/capture"
 class HoneytokenGenerator:
-    """
-    Generates per-session synthetic financial artifacts for PHANTOM.
-
-    Usage
-    -----
-    >>> gen = HoneytokenGenerator()
-    >>> bundle = gen.generate(persona)
-    >>> otp = gen.refresh_otp(bundle, bank="HDFC", amount=5000.0)
-    """
-
-    # Synthetic holder names — clearly fictional to avoid real-person conflict
-    _HOLDER_NAMES: list[str] = [
+    _HOLDER_NAMES:list[str]=[
         "Vikram Testpal",
         "Ananya Phantom",
         "Rahul Honeysim",
@@ -124,61 +55,36 @@ class HoneytokenGenerator:
         "Arjun Trapuser",
         "Deepa Testnode",
     ]
-
-    # Synthetic IFSC prefix map (real bank codes, synthetic branch codes)
-    _BANK_IFSC_PREFIXES: dict[str, str] = {
-        "SBI":   "SBIN",
-        "HDFC":  "HDFC",
-        "ICICI": "ICIC",
-        "AXIS":  "UTIB",
-        "KOTAK": "KKBK",
-        "PNB":   "PUNB",
-        "BOI":   "BKID",
+    _BANK_IFSC_PREFIXES:dict[str,str]={
+        "SBI":"SBIN",
+        "HDFC":"HDFC",
+        "ICICI":"ICIC",
+        "AXIS":"UTIB",
+        "KOTAK":"KKBK",
+        "PNB":"PUNB",
+        "BOI":"BKID",
     }
-
-    # Synthetic BIN prefixes (real IIN ranges, but honeytoken numbers)
-    _CARD_BINS: dict[str, list[str]] = {
-        "VISA": ["4111", "4012", "4532"],
-        "MASTERCARD": ["5100", "5200", "5454"],
-        "RUPAY": ["6069", "6070", "6521"],
+    _CARD_BINS:dict[str,list[str]]={
+        "VISA":["4111","4012","4532"],
+        "MASTERCARD":["5100","5200","5454"],
+        "RUPAY":["6069","6070","6521"],
     }
-
-    def __init__(self, seed: Optional[int] = None) -> None:
-        self._rng = random.Random(seed)
-        logger.info("[HoneytokenGenerator] Initialised (seed=%s)", seed)
-
-    def generate(self, persona: AndroidPersona) -> PhantomHoneytokenBundle:
-        """
-        Generate a complete per-session honeytoken bundle.
-
-        Parameters
-        ----------
-        persona : AndroidPersona
-            Device persona for context binding.
-
-        Returns
-        -------
-        PhantomHoneytokenBundle
-        """
-        t0 = time.perf_counter()
-        session_id = persona.session_id
-        holder = self._rng.choice(self._HOLDER_NAMES)
-
-        # Generate two bank accounts (primary + secondary, different banks)
-        bank_names = self._rng.sample(list(self._BANK_IFSC_PREFIXES.keys()), 2)
-        primary_account = self._generate_account(holder, bank_names[0], session_id)
-        secondary_account = self._generate_account(holder, bank_names[1], session_id + "2")
-        primary_card = self._generate_card(holder, bank_names[0])
-
-        # Generate synthetic SMS history
-        sms_history = self._generate_sms_history(
-            primary_account, secondary_account, n_messages=15
+    def __init__(self,seed:Optional[int]=None)->None:
+        self._rng=random.Random(seed)
+        logger.info("[HoneytokenGenerator] Initialised (seed=%s)",seed)
+    def generate(self,persona:AndroidPersona)->PhantomHoneytokenBundle:
+        t0=time.perf_counter()
+        session_id=persona.session_id
+        holder=self._rng.choice(self._HOLDER_NAMES)
+        bank_names=self._rng.sample(list(self._BANK_IFSC_PREFIXES.keys()),2)
+        primary_account=self._generate_account(holder,bank_names[0],session_id)
+        secondary_account=self._generate_account(holder,bank_names[1],session_id+"2")
+        primary_card=self._generate_card(holder,bank_names[0])
+        sms_history=self._generate_sms_history(
+            primary_account,secondary_account,n_messages=15
         )
-
-        # Issue an initial OTP for the primary account
-        active_otp = self._generate_otp()
-
-        bundle = PhantomHoneytokenBundle(
+        active_otp=self._generate_otp()
+        bundle=PhantomHoneytokenBundle(
             session_id=session_id,
             persona_model=persona.model,
             created_at=time.time(),
@@ -190,101 +96,70 @@ class HoneytokenGenerator:
             otp_issued_at=time.time(),
             otp_target_bank=bank_names[0],
         )
-
-        elapsed_ms = (time.perf_counter() - t0) * 1000
+        elapsed_ms=(time.perf_counter()-t0)*1000
         logger.info(
             "[HoneytokenGenerator] Bundle generated: session=%s banks=%s "
             "sms_count=%d (%.1f ms)",
-            session_id[:8], bank_names, len(sms_history), elapsed_ms,
+            session_id[:8],bank_names,len(sms_history),elapsed_ms,
         )
         return bundle
-
     def refresh_otp(
         self,
-        bundle: PhantomHoneytokenBundle,
-        bank: str = "",
-        amount: float = 0.0,
-        purpose: str = "login",
-    ) -> str:
-        """
-        Issue a fresh OTP and update the bundle.
-        Call this whenever the malware triggers an OTP-based flow.
-
-        Returns
-        -------
-        str
-            The new honeytoken OTP value.
-        """
-        otp = self._generate_otp()
-        bundle.active_otp = otp
-        bundle.otp_issued_at = time.time()
-        bundle.otp_target_bank = bank or bundle.otp_target_bank
-
-        # Append the OTP SMS to the synthetic history
-        sms = self._format_otp_sms(bank or bundle.otp_target_bank, otp, amount, purpose)
-        bundle.synthetic_sms.insert(0, sms)  # Newest SMS first
-        logger.info("[HoneytokenGenerator] OTP refreshed: %s for %s", otp, bank)
+        bundle:PhantomHoneytokenBundle,
+        bank:str="",
+        amount:float=0.0,
+        purpose:str="login",
+    )->str:
+        otp=self._generate_otp()
+        bundle.active_otp=otp
+        bundle.otp_issued_at=time.time()
+        bundle.otp_target_bank=bank or bundle.otp_target_bank
+        sms=self._format_otp_sms(bank or bundle.otp_target_bank,otp,amount,purpose)
+        bundle.synthetic_sms.insert(0,sms)
+        logger.info("[HoneytokenGenerator] OTP refreshed: %s for %s",otp,bank)
         return otp
-
-    def format_as_android_sms_db(self, bundle: PhantomHoneytokenBundle) -> list[dict]:
-        """
-        Format synthetic SMS list as Android SMS content provider rows.
-
-        Used by PHANTOM LLM to simulate ContentProvider query results
-        when malware reads SMS using Telephony.Sms.Inbox.
-        """
-        rows = []
-        for i, sms in enumerate(bundle.synthetic_sms):
-            # Timestamp: spread over the last 30 days
-            age_s = (i + 1) * self._rng.uniform(300, 7200)  # 5 min – 2 hr gaps
-            ts_ms = int((time.time() - age_s) * 1000)
+    def format_as_android_sms_db(self,bundle:PhantomHoneytokenBundle)->list[dict]:
+        rows=[]
+        for i,sms in enumerate(bundle.synthetic_sms):
+            age_s=(i+1)*self._rng.uniform(300,7200)
+            ts_ms=int((time.time()-age_s)*1000)
             rows.append({
-                "_id": 1000 + i,
-                "thread_id": self._rng.randint(100, 200),
-                "address": sms.get("sender", "BANK"),
-                "date": ts_ms,
-                "date_sent": ts_ms - self._rng.randint(50, 500),
-                "body": sms.get("body", ""),
-                "read": 1,
-                "type": 1,     # TYPE_INBOX
-                "status": -1,  # STATUS_NONE
-                "locked": 0,
-                "error_code": 0,
+                "_id":1000+i,
+                "thread_id":self._rng.randint(100,200),
+                "address":sms.get("sender","BANK"),
+                "date":ts_ms,
+                "date_sent":ts_ms-self._rng.randint(50,500),
+                "body":sms.get("body",""),
+                "read":1,
+                "type":1,
+                "status":-1,
+                "locked":0,
+                "error_code":0,
             })
         return rows
-
-    # ─────────────────────────────────────────────────────────────────────────
-    # Internal generation helpers
-    # ─────────────────────────────────────────────────────────────────────────
-
     def _generate_account(
         self,
-        holder: str,
-        bank: str,
-        session_salt: str,
-    ) -> BankAccount:
-        """Generate a synthetic bank account with an internal marker."""
-        ifsc_prefix = self._BANK_IFSC_PREFIXES.get(bank, "SBIN")
-        branch_code = "0" + "".join(str(self._rng.randint(0, 9)) for _ in range(6))
-        ifsc = f"{ifsc_prefix}{branch_code}"
-
-        # Account number: 11-16 digits with internal marker
-        account_num = (
-            str(self._rng.randint(10, 99))
-            + "".join(str(self._rng.randint(0, 9)) for _ in range(12))
+        holder:str,
+        bank:str,
+        session_salt:str,
+    )->BankAccount:
+        ifsc_prefix=self._BANK_IFSC_PREFIXES.get(bank,"SBIN")
+        branch_code="0"+"".join(str(self._rng.randint(0,9))for _ in range(6))
+        ifsc=f"{ifsc_prefix}{branch_code}"
+        account_num=(
+            str(self._rng.randint(10,99))
+            +"".join(str(self._rng.randint(0,9))for _ in range(12))
         )
-
-        upi_vpa = (
+        upi_vpa=(
             f"{_HONEYTOKEN_MARKER.lower()}"
-            f"{self._rng.randint(1000, 9999)}"
+            f"{self._rng.randint(1000,9999)}"
             f"@{bank.lower()}"
         )
-        balance = round(self._rng.uniform(5000.0, 150000.0), 2)
-        mpin = "".join(str(self._rng.randint(0, 9)) for _ in range(6))
-        net_id = f"{_HONEYTOKEN_MARKER}{self._rng.randint(10000000, 99999999)}"
-        net_pass = self._rng.choices(string.ascii_letters + string.digits, k=12)
-        net_pass_str = "PHA@" + "".join(net_pass)
-
+        balance=round(self._rng.uniform(5000.0,150000.0),2)
+        mpin="".join(str(self._rng.randint(0,9))for _ in range(6))
+        net_id=f"{_HONEYTOKEN_MARKER}{self._rng.randint(10000000,99999999)}"
+        net_pass=self._rng.choices(string.ascii_letters+string.digits,k=12)
+        net_pass_str="PHA@"+"".join(net_pass)
         return BankAccount(
             bank_name=bank,
             ifsc_code=ifsc,
@@ -299,23 +174,17 @@ class HoneytokenGenerator:
                 f"{session_salt}{account_num}".encode()
             ).hexdigest()[:32],
         )
-
-    def _generate_card(self, holder: str, bank: str) -> PaymentCard:
-        """Generate a Luhn-valid synthetic payment card."""
-        card_type = self._rng.choice(["VISA", "MASTERCARD", "RUPAY"])
-        bin_prefix = self._rng.choice(self._CARD_BINS[card_type])
-
-        # Generate 12 more digits (BIN = 4, total = 16)
-        partial = bin_prefix + "".join(
-            str(self._rng.randint(0, 9)) for _ in range(11)
+    def _generate_card(self,holder:str,bank:str)->PaymentCard:
+        card_type=self._rng.choice(["VISA","MASTERCARD","RUPAY"])
+        bin_prefix=self._rng.choice(self._CARD_BINS[card_type])
+        partial=bin_prefix+"".join(
+            str(self._rng.randint(0,9))for _ in range(11)
         )
-        check = self._luhn_check_digit(partial)
-        card_num = partial + str(check)
-
-        expiry_month = self._rng.randint(1, 12)
-        expiry_year = 2026 + self._rng.randint(0, 4)
-        cvv = "".join(str(self._rng.randint(0, 9)) for _ in range(3))
-
+        check=self._luhn_check_digit(partial)
+        card_num=partial+str(check)
+        expiry_month=self._rng.randint(1,12)
+        expiry_year=2026+self._rng.randint(0,4)
+        cvv="".join(str(self._rng.randint(0,9))for _ in range(3))
         return PaymentCard(
             card_number=card_num,
             card_holder=holder,
@@ -326,57 +195,49 @@ class HoneytokenGenerator:
             bank_name=bank,
             last_four=card_num[-4:],
         )
-
     def _generate_sms_history(
         self,
-        primary: BankAccount,
-        secondary: BankAccount,
-        n_messages: int = 15,
-    ) -> list[dict]:
-        """Generate a realistic SMS history with banking alerts."""
-        smses: list[dict] = []
-        banks = [primary.bank_name, secondary.bank_name]
-
+        primary:BankAccount,
+        secondary:BankAccount,
+        n_messages:int=15,
+    )->list[dict]:
+        smses:list[dict]=[]
+        banks=[primary.bank_name,secondary.bank_name]
         for i in range(n_messages):
-            bank = self._rng.choice(banks)
-            account = primary if bank == primary.bank_name else secondary
-            templates = PHANTOM_SMS_TEMPLATES.get(bank, PHANTOM_SMS_TEMPLATES["SBI"])
-            template = self._rng.choice(templates)
-
-            amount = round(self._rng.uniform(100.0, 25000.0), 2)
-            otp = self._generate_otp()
-
-            body = template.format(
+            bank=self._rng.choice(banks)
+            account=primary if bank==primary.bank_name else secondary
+            templates=PHANTOM_SMS_TEMPLATES.get(bank,PHANTOM_SMS_TEMPLATES["SBI"])
+            template=self._rng.choice(templates)
+            amount=round(self._rng.uniform(100.0,25000.0),2)
+            otp=self._generate_otp()
+            body=template.format(
                 otp=otp,
                 account=account.account_number[-4:],
                 account_last4=account.account_number[-4:],
                 amount=f"{amount:,.2f}",
                 balance=f"{account.balance_inr:,.2f}",
-                card_last4=f"XXXX{self._rng.randint(1000, 9999)}",
+                card_last4=f"XXXX{self._rng.randint(1000,9999)}",
                 merchant=self._rng.choice(
-                    ["Amazon", "BigBasket", "Swiggy", "Zepto", "Flipkart"]
+                    ["Amazon","BigBasket","Swiggy","Zepto","Flipkart"]
                 ),
                 date=f"{self._rng.randint(1,28):02d}/{self._rng.randint(1,12):02d}/2026",
-                minutes=self._rng.choice([3, 5, 10, 15]),
-                purpose=self._rng.choice(["login", "transaction", "fund transfer", "OTP"]),
+                minutes=self._rng.choice([3,5,10,15]),
+                purpose=self._rng.choice(["login","transaction","fund transfer","OTP"]),
             )
             smses.append({
-                "sender": f"VM-{bank[:3].upper()}BNK",
-                "body": body,
-                "bank": bank,
+                "sender":f"VM-{bank[:3].upper()}BNK",
+                "body":body,
+                "bank":bank,
             })
-
         return smses
-
     def _format_otp_sms(
-        self, bank: str, otp: str, amount: float, purpose: str
-    ) -> dict:
-        """Format a fresh OTP as an SMS dict."""
-        templates = PHANTOM_SMS_TEMPLATES.get(bank, PHANTOM_SMS_TEMPLATES["SBI"])
-        template = self._rng.choice(
-            [t for t in templates if "{otp}" in t] or templates
+        self,bank:str,otp:str,amount:float,purpose:str
+    )->dict:
+        templates=PHANTOM_SMS_TEMPLATES.get(bank,PHANTOM_SMS_TEMPLATES["SBI"])
+        template=self._rng.choice(
+            [t for t in templates if "{otp}" in t]or templates
         )
-        body = template.format(
+        body=template.format(
             otp=otp,
             amount=f"{amount:,.2f}" if amount else "0.00",
             account="XX1234",
@@ -388,19 +249,15 @@ class HoneytokenGenerator:
             purpose=purpose,
             balance="50,000.00",
         )
-        return {"sender": f"VM-{bank[:3].upper()}BNK", "body": body, "bank": bank}
-
-    def _generate_otp(self) -> str:
-        """Generate a 6-digit honeytoken OTP."""
-        return "".join(str(self._rng.randint(0, 9)) for _ in range(6))
-
+        return{"sender":f"VM-{bank[:3].upper()}BNK","body":body,"bank":bank}
+    def _generate_otp(self)->str:
+        return "".join(str(self._rng.randint(0,9))for _ in range(6))
     @staticmethod
-    def _luhn_check_digit(number: str) -> int:
-        """Standard Luhn check digit for card number validation."""
-        digits = [int(d) for d in number]
-        for i in range(len(digits) - 2, -1, -2):
-            digits[i] *= 2
-            if digits[i] > 9:
-                digits[i] -= 9
-        total = sum(digits)
-        return (10 - (total % 10)) % 10
+    def _luhn_check_digit(number:str)->int:
+        digits=[int(d)for d in number]
+        for i in range(len(digits)-2,-1,-2):
+            digits[i]*=2
+            if digits[i]>9:
+                digits[i]-=9
+        total=sum(digits)
+        return(10-(total%10))%10

@@ -1,22 +1,16 @@
-"""
-ORACLE-TMF  ·  models/mutation_artifact_graph.py
-=================================================
-The Mutation Artifact Graph (MAG) is the canonical data structure that
-flows between every pipeline stage.  It is a JSON-serialisable Python
-dataclass—completely free of external dependencies so any stage can
-import it without circular imports.
-Schema reference:  Section 2.3 of the TMF research paper.
+﻿"""
+ORACLE-TMF - models/mutation_artifact_graph.py
+==============================================
+The Mutation Artifact Graph (MAG) is the canonical JSON-serialisable data
+structure passed between pipeline stages.
 """
 from __future__ import annotations
 import json
-from dataclasses import dataclass,field,asdict
-from typing import Optional
+from dataclasses import asdict,dataclass,field
 from enum import Enum
-
-
-
+from typing import Optional
 class ArtifactClass(str,Enum):
-    """The 7-class mutation artifact taxonomy (ORACLE-TMF Extended Taxonomy)."""
+    """The 7-class mutation artifact taxonomy."""
     DEAD_CODE="CLASS_1_DEAD_CODE"
     UNUSED_PERMISSION="CLASS_2_UNUSED_PERMISSION"
     PLACEHOLDER_STRING="CLASS_3_PLACEHOLDER_STRING"
@@ -25,7 +19,7 @@ class ArtifactClass(str,Enum):
     UNFINISHED_UI_FLOW="CLASS_6_UNFINISHED_UI"
     GENAI_API_SCAFFOLD="CLASS_7_GENAI_SCAFFOLD"
 class DTEClass(str,Enum):
-    """Dormancy Taxonomy Engine output labels for dead code classification."""
+    """Dormancy Taxonomy Engine output labels."""
     REMNANT="REMNANT"
     SCAFFOLDING="SCAFFOLDING"
     LOGIC_BOMB="LOGIC_BOMB"
@@ -44,21 +38,14 @@ class MITREMobileTactic(str,Enum):
     COMMAND_AND_CONTROL="TA0011"
     EXFILTRATION="TA0036"
     IMPACT="TA0034"
-
-
-
 @dataclass
 class DeadCodeArtifact:
-    """
-    CLASS 1 — Dead Code / Unreachable Methods.
-    Smali methods with zero incoming edges in the global CFG that are
-    not standard Android lifecycle callbacks.
-    """
-    class_name:str 
-    method_name:str 
-    smali_code:str 
-    opcode_count:int 
-    dte_label:DTEClass=DTEClass.SCAFFOLDING 
+    """CLASS 1 - Dead Code / Unreachable Methods."""
+    class_name:str
+    method_name:str
+    smali_code:str
+    opcode_count:int
+    dte_label:DTEClass=DTEClass.SCAFFOLDING
     dte_confidence:float=0.0
     pseudo_java:str=""
     trigger_depth:int=0
@@ -67,123 +54,124 @@ class DeadCodeArtifact:
     guard_indegree:int=0
 @dataclass
 class UnusedPermissionArtifact:
-    """
-    CLASS 2 — Unused Permission Intents.
-    Android permissions declared in AndroidManifest.xml whose corresponding
-    protected framework APIs never appear in the reachable CFG.
-    """
-    permission_name:str 
+    """CLASS 2 - Unused Permission Intents."""
+    permission_name:str
     android_permission_group:str=""
     expected_apis:list[str]=field(default_factory=list)
     context_note:str=""
 @dataclass
 class PlaceholderStringArtifact:
-    """
-    CLASS 3 — Placeholder Strings & Resources.
-    High-entropy or patterned string literals in the string pool or
-    res/values/strings.xml that reference unbuilt features or staging infra.
-    """
-    value:str 
-    source:str 
+    """CLASS 3 - Placeholder Strings and Resources."""
+    value:str
+    source:str
     entropy:float=0.0
     matched_pattern:str=""
     key_name:str=""
 @dataclass
 class C2EndpointStubArtifact:
-    """
-    CLASS 4 — C2 Endpoint Stubs.
-    Network routing logic (OkHttp/Retrofit) that defines API paths, payload schemas,
-    or HTTP methods but is never actually executed (.execute() / .enqueue() absent).
-    """
-    class_name:str 
-    method_name:str 
-    framework:str 
+    """CLASS 4 - C2 Endpoint Stubs."""
+    class_name:str
+    method_name:str
+    framework:str
     extracted_url:str=""
     http_method:str=""
     payload_schema:str=""
 @dataclass
 class PartialAPIArtifact:
-    """
-    CLASS 5 — Partial API Implementations.
-    Classes extending sensitive Android framework interfaces (AccessibilityService,
-    DeviceAdminReceiver) where overriding methods contain < 10 opcodes and no
-    malicious API invocations — indicating architectural groundwork without payload.
-    """
-    class_name:str 
-    interface_extended:str 
+    """CLASS 5 - Partial sensitive framework API implementations."""
+    class_name:str
+    interface_extended:str
     method_stubs:list[str]=field(default_factory=list)
     opcode_counts:dict[str,int]=field(default_factory=dict)
 @dataclass
 class UnfinishedUIFlowArtifact:
-    """
-    CLASS 6 — Unfinished UI Flows.
-    Activity / Fragment / WebView XML layout files present in res/layout/ that
-    are never inflated via setContentView() or Fragment.inflate() in the DEX.
-    """
-    layout_file:str 
+    """CLASS 6 - Unfinished UI flows."""
+    layout_file:str
     layout_id:str=""
     suspected_type:str=""
     asset_refs:list[str]=field(default_factory=list)
 @dataclass
 class GenAIAPIScaffoldArtifact:
-    """
-    CLASS 7 — GenAI API Scaffolds (TMF-Psi).
-    NEW in ORACLE-TMF: Dormant stubs for LLM API endpoints (Gemini, GPT-4,
-    Anthropic Claude, Ollama).  Signals the malware is being augmented with
-    generative AI for adaptive behaviour.
-    """
-    class_name:str 
-    method_name:str 
+    """CLASS 7 - GenAI API scaffolds."""
+    class_name:str
+    method_name:str
     provider:str=""
     api_endpoint:str=""
     model_hint:str=""
-
-
-
 @dataclass
 class VersionDelta:
-    """
-    Output of Stage I (Version Diff Engine).
-    Records the artifacts added/removed between v_{n-1} and v_n to compute
-    the Mutation Velocity Vector (MVV).
-    """
+    """Output of Stage I version diff and Mutation Velocity Vector scoring."""
     artifacts_added:list[dict]=field(default_factory=list)
     artifacts_removed:list[dict]=field(default_factory=list)
     edit_distance:float=0.0
     mvv_raw:float=1.0
     mvv_normalized:float=1.0
-
-
-
 @dataclass
 class MutationForecast:
-    """
-    A single mutation forecast prediction with Bayesian confidence scoring.
-    One MAG may produce 1-N forecasts.
-    """
-    
+    """A single mutation forecast prediction with Bayesian confidence scoring."""
     predicted_tactic:str=""
     predicted_technique:str=""
     technique_name:str=""
     rationale:str=""
     p_llm:float=0.0
-    
     artifact_density:float=0.0
     mvv_normalized:float=1.0
     h_prior:float=0.0
-    
     confidence_score:float=0.0
-    passes_gate:bool=False 
+    passes_gate:bool=False
     supporting_artifacts:list[str]=field(default_factory=list)
-    
     predicted_target_institutions:list[str]=field(default_factory=list)
     predicted_target_countries:list[str]=field(default_factory=list)
+@dataclass
+class Stage2IntelligenceSummary:
+    """
+    Compact Stage 2 aggregate for JSON, API, Streamlit, and paper drafts.
 
-
-
+    The full Stage2Report can be large and stage-specific. This summary keeps
+    the stable high-value fields consumers need without coupling them to every
+    research engine implementation detail.
+    """
+    available:bool=False
+    enabled_stages:list[str]=field(default_factory=list)
+    skipped_lab_stages:list[str]=field(default_factory=list)
+    nav_redirection:str=""
+    builder_cluster_id:int=-1
+    robustness_score:float=0.0
+    highest_network_threat:str="NONE"
+    network_threat_count:int=0
+    max_amplification_factor:float=0.0
+    has_dga:bool=False
+    suricata_rules_count:int=0
+    stix_indicators_count:int=0
+    confirmed_behaviors:list[str]=field(default_factory=list)
+    collusion_paths_found:int=0
+    adjusted_forecasts_count:int=0
+    total_elapsed_ms:float=0.0
+    safety_mode:str="SAFE_STATIC_DEFAULT"
+    intelligence_notes:list[str]=field(default_factory=list)
+@dataclass
+class ResearchReadinessReport:
+    """Research and publication readiness summary."""
+    publication_readiness_score:float=0.0
+    evidence_strength_score:float=0.0
+    novelty_score:float=0.0
+    reproducibility_score:float=0.0
+    stage2_intelligence_score:float=0.0
+    operational_risk_score:float=0.0
+    risk_tier:str="LOW"
+    paper_readiness:str="INSUFFICIENT"
+    headline_claim:str=""
+    evidence_matrix:list[dict]=field(default_factory=list)
+    methodology_cards:list[dict]=field(default_factory=list)
+    key_findings:list[str]=field(default_factory=list)
+    limitations:list[str]=field(default_factory=list)
+    recommended_next_steps:list[str]=field(default_factory=list)
+    reproducibility_checklist:list[dict]=field(default_factory=list)
+    suggested_figures:list[str]=field(default_factory=list)
+    dataset_card:dict=field(default_factory=dict)
 @dataclass
 class APKMetadata:
-    """Computed in Stage A. Propagated through all downstream stages."""
+    """Computed in Stage A and propagated through downstream stages."""
     apk_path:str=""
     package_name:str=""
     version_name:str=""
@@ -200,21 +188,10 @@ class APKMetadata:
     is_packed:bool=False
     packer_hint:str=""
     entry_points:list[str]=field(default_factory=list)
-
-
-
 @dataclass
 class MutationArtifactGraph:
-    """
-    The Mutation Artifact Graph (MAG) — the canonical data structure
-    passed between every pipeline stage.
-    Stages populate their relevant fields and pass the enriched MAG forward.
-    The orchestrator owns the single MAG instance for an APK analysis run.
-    JSON serialisation: call mag.to_json() for the Stage-J context payload.
-    """
-    
+    """Canonical analysis graph for one APK analysis run."""
     apk_metadata:APKMetadata=field(default_factory=APKMetadata)
-    
     dead_code:list[DeadCodeArtifact]=field(default_factory=list)
     unused_permissions:list[UnusedPermissionArtifact]=field(default_factory=list)
     placeholder_strings:list[PlaceholderStringArtifact]=field(default_factory=list)
@@ -222,20 +199,15 @@ class MutationArtifactGraph:
     partial_apis:list[PartialAPIArtifact]=field(default_factory=list)
     unfinished_ui_flows:list[UnfinishedUIFlowArtifact]=field(default_factory=list)
     genai_scaffolds:list[GenAIAPIScaffoldArtifact]=field(default_factory=list)
-    
     manifest:dict=field(default_factory=dict)
-    
     version_delta:Optional[VersionDelta]=None
     malware_family:str=""
     family_version:str=""
-    
     forecasts:list[MutationForecast]=field(default_factory=list)
-    
+    stage2_intelligence:Optional[Stage2IntelligenceSummary]=None
+    research_readiness:Optional[ResearchReadinessReport]=None
     stage_errors:dict[str,str]=field(default_factory=dict)
     stage_timings_ms:dict[str,float]=field(default_factory=dict)
-    
-    
-    
     def total_artifact_count(self)->int:
         """Total number of mutation artifacts detected across all 7 classes."""
         return(
@@ -248,7 +220,7 @@ class MutationArtifactGraph:
             +len(self.genai_scaffolds)
         )
     def artifact_class_counts(self)->dict[str,int]:
-        """Per-class artifact counts for the Streamlit dashboard gauges."""
+        """Per-class artifact counts for dashboards and reports."""
         return{
             ArtifactClass.DEAD_CODE.value:len(self.dead_code),
             ArtifactClass.UNUSED_PERMISSION.value:len(self.unused_permissions),
@@ -259,16 +231,15 @@ class MutationArtifactGraph:
             ArtifactClass.GENAI_API_SCAFFOLD.value:len(self.genai_scaffolds),
         }
     def scaffolding_artifacts(self)->list[DeadCodeArtifact]:
-        """Dead code fragments classified as SCAFFOLDING by the DTE — sent to Stage J."""
+        """Dead-code fragments classified as SCAFFOLDING by DTE."""
         return[a for a in self.dead_code if a.dte_label==DTEClass.SCAFFOLDING]
     def high_confidence_forecasts(self,threshold:float=0.72)->list[MutationForecast]:
-        """Forecasts that passed the Bayesian gating threshold."""
+        """Forecasts above the Bayesian gating threshold."""
         return[f for f in self.forecasts if f.confidence_score>threshold]
     def compute_artifact_density(self)->float:
         """
         D_artifact: multi-artifact convergence score.
-        Counts how many distinct artifact CLASSES point to at least one finding.
-        Normalised to [0.33, 0.66, 1.00] based on 1/2/3+ converging classes.
+        Normalised to 0.33/0.66/1.00 for 1/2/3+ active core classes.
         """
         active_classes=sum([
             1 if self.dead_code else 0,
@@ -279,36 +250,24 @@ class MutationArtifactGraph:
         ])
         if active_classes>=3:
             return 1.00
-        elif active_classes==2:
+        if active_classes==2:
             return 0.66
-        elif active_classes==1:
+        if active_classes==1:
             return 0.33
         return 0.0
-    
-    
-    
     def to_dict(self)->dict:
-        """Full serialisation to a Python dict (recursively converts dataclasses)."""
+        """Full serialisation to a Python dict."""
         def _convert(obj):
-            if isinstance(obj,(DeadCodeArtifact,UnusedPermissionArtifact,
-                                PlaceholderStringArtifact,C2EndpointStubArtifact,
-                                PartialAPIArtifact,UnfinishedUIFlowArtifact,
-                                GenAIAPIScaffoldArtifact,VersionDelta,
-                                MutationForecast,APKMetadata)):
-                d=asdict(obj)
-                
-                for k,v in d.items():
-                    if isinstance(v,Enum):
-                        d[k]=v.value
-                return d
-            elif isinstance(obj,Enum):
+            if isinstance(obj,Enum):
                 return obj.value
-            elif isinstance(obj,list):
+            if isinstance(obj,list):
                 return[_convert(i)for i in obj]
-            elif isinstance(obj,dict):
+            if isinstance(obj,dict):
                 return{k:_convert(v)for k,v in obj.items()}
+            if hasattr(obj,"__dataclass_fields__"):
+                return _convert(asdict(obj))
             return obj
-        result={
+        return{
             "apk_metadata":_convert(self.apk_metadata),
             "mutation_artifacts":{
                 "dead_code":[_convert(a)for a in self.dead_code],
@@ -319,58 +278,69 @@ class MutationArtifactGraph:
                 "unfinished_ui_flows":[_convert(a)for a in self.unfinished_ui_flows],
                 "genai_scaffolds":[_convert(a)for a in self.genai_scaffolds],
             },
-            "manifest":self.manifest,
+            "manifest":_convert(self.manifest),
             "version_delta":_convert(self.version_delta)if self.version_delta else None,
             "malware_family":self.malware_family,
             "family_version":self.family_version,
             "forecasts":[_convert(f)for f in self.forecasts],
+            "stage2_intelligence":_convert(self.stage2_intelligence)if self.stage2_intelligence else None,
+            "research_readiness":_convert(self.research_readiness)if self.research_readiness else None,
             "artifact_summary":self.artifact_class_counts(),
             "total_artifacts":self.total_artifact_count(),
-            "stage_errors":self.stage_errors,
-            "stage_timings_ms":self.stage_timings_ms,
+            "stage_errors":_convert(self.stage_errors),
+            "stage_timings_ms":_convert(self.stage_timings_ms),
         }
-        return result
     def to_json(self,indent:int=2)->str:
-        """Serialise to JSON string (used as LLM context payload in Stage J)."""
+        """Serialise to JSON string."""
         return json.dumps(self.to_dict(),indent=indent,default=str)
     def to_llm_context(self,max_chars:int=16_000)->str:
-        """
-        Compact JSON for LLM context window.
-        Strips large fields (raw Smali) if total length would exceed max_chars.
-        """
+        """Compact JSON for the LLM context window."""
         compact=self.to_dict()
-        
-        for entry in compact.get("mutation_artifacts",{}).get("dead_code",[]):
-            if len(self.to_json())>max_chars:
-                entry.pop("smali_code",None)
         result=json.dumps(compact,indent=2,default=str)
         if len(result)>max_chars:
-            
-            result=result[:max_chars-50]+"\n... [TRUNCATED — context limit reached]"
+            for entry in compact.get("mutation_artifacts",{}).get("dead_code",[]):
+                entry.pop("smali_code",None)
+            result=json.dumps(compact,indent=2,default=str)
+        if len(result)>max_chars:
+            result=result[:max_chars-50]+"\n... [TRUNCATED - context limit reached]"
         return result
     @classmethod
     def from_dict(cls,data:dict)->"MutationArtifactGraph":
-        """Deserialise from a dict (e.g. loaded from JSON cache)."""
+        """Deserialise from a dict loaded from JSON cache or report output."""
         mag=cls()
         meta=data.get("apk_metadata",{})
         mag.apk_metadata=APKMetadata(**meta)if meta else APKMetadata()
         mag.manifest=data.get("manifest",{})
         mag.malware_family=data.get("malware_family","")
         mag.family_version=data.get("family_version","")
+        version_delta=data.get("version_delta")
+        if version_delta:
+            mag.version_delta=VersionDelta(**version_delta)
+        stage2=data.get("stage2_intelligence")or data.get("stage2_summary")
+        if stage2:
+            mag.stage2_intelligence=Stage2IntelligenceSummary(**stage2)
+        rr=data.get("research_readiness")
+        if rr:
+            mag.research_readiness=ResearchReadinessReport(**rr)
         mag.stage_errors=data.get("stage_errors",{})
         mag.stage_timings_ms=data.get("stage_timings_ms",{})
         artifacts=data.get("mutation_artifacts",{})
-        mag.dead_code=[DeadCodeArtifact(**a)for a in artifacts.get("dead_code",[])]
-        mag.unused_permissions=[
-            UnusedPermissionArtifact(**a)for a in artifacts.get("unused_permissions",[])
-        ]
-        mag.placeholder_strings=[
-            PlaceholderStringArtifact(**a)for a in artifacts.get("placeholder_strings",[])
-        ]
-        mag.c2_stubs=[
-            C2EndpointStubArtifact(**a)for a in artifacts.get("c2_stubs",[])
-        ]
-        mag.partial_apis=[
-            PartialAPIArtifact(**a)for a in artifacts.get("partial_apis",[])
-        ]
+        mag.dead_code=[DeadCodeArtifact(**cls._normalise_dead_code(a))for a in artifacts.get("dead_code",[])]
+        mag.unused_permissions=[UnusedPermissionArtifact(**a)for a in artifacts.get("unused_permissions",[])]
+        mag.placeholder_strings=[PlaceholderStringArtifact(**a)for a in artifacts.get("placeholder_strings",[])]
+        mag.c2_stubs=[C2EndpointStubArtifact(**a)for a in artifacts.get("c2_stubs",[])]
+        mag.partial_apis=[PartialAPIArtifact(**a)for a in artifacts.get("partial_apis",[])]
+        mag.unfinished_ui_flows=[UnfinishedUIFlowArtifact(**a)for a in artifacts.get("unfinished_ui_flows",[])]
+        mag.genai_scaffolds=[GenAIAPIScaffoldArtifact(**a)for a in artifacts.get("genai_scaffolds",[])]
+        mag.forecasts=[MutationForecast(**f)for f in data.get("forecasts",[])]
         return mag
+    @staticmethod
+    def _normalise_dead_code(data:dict)->dict:
+        item=dict(data)
+        label=item.get("dte_label")
+        if isinstance(label,str):
+            try:
+                item["dte_label"]=DTEClass(label)
+            except ValueError:
+                item["dte_label"]=DTEClass.SCAFFOLDING
+        return item

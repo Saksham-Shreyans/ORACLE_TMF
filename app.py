@@ -1,5 +1,5 @@
-"""
-ORACLE-TMF  ·  app.py
+﻿"""
+ORACLE-TMF - app.py
 =======================
 Streamlit Frontend Dashboard
 Provides the visual interface for ORACLE-TMF analysts:
@@ -10,8 +10,8 @@ Provides the visual interface for ORACLE-TMF analysts:
   Tab 2 (Artifacts)  : Expandable sections for all 7 artifact classes.
                         Dead Code shows Smali + Agent 1 pseudo-Java side by side.
                         DTE labels colour-coded (SCAFFOLDING=blue, LOGIC_BOMB=red)
-  Tab 3 (Forecasts)  : "Evolutionary Mutation Timeline" — the wow factor.
-                        v_n-1 (Past) → v_n (Present) → v_n+1 (Predicted).
+  Tab 3 (Forecasts)  : Evolutionary Mutation Timeline.
+                        v_n-1 (Past) -> v_n (Present) -> v_n+1 (Predicted).
                         Per-forecast confidence breakdown + MITRE mapping.
   Tab 4 (Export)     : Download buttons for JSON, YARA, STIX 2.1, PDF brief
 Run:
@@ -24,16 +24,14 @@ import sys
 import tempfile
 import time
 from pathlib import Path
-from security import clean_text, escaped
+from security import clean_text,escaped
 import streamlit as st
-
 st.set_page_config(
     page_title="ORACLE-TMF",
-    page_icon="🔮",
+    page_icon="O",
     layout="wide",
     initial_sidebar_state="expanded",
 )
-
 st.markdown("""
 <style>
     /* Core dark palette */
@@ -66,7 +64,6 @@ st.markdown("""
     h3 { color: #aabbdd; }
 </style>
 """,unsafe_allow_html=True)
-
 try:
     import plotly.graph_objects as go
     _PLOTLY_OK=True
@@ -78,10 +75,7 @@ try:
     _ORCH_OK=True
 except ImportError:
     _ORCH_OK=False
-
-
-
-@st.cache_resource(show_spinner="Initialising ORACLE-TMF pipeline…")
+@st.cache_resource(show_spinner="Initialising ORACLE-TMF pipeline...")
 def get_orchestrator():
     """Single orchestrator instance shared across Streamlit sessions."""
     if not _ORCH_OK:
@@ -106,7 +100,7 @@ def run_analysis_cached(apk_bytes:bytes,prev_bytes:bytes|None,skip_llm:bool,stag
             with open(prev_path,"wb")as fh:
                 fh.write(prev_bytes)
         try:
-            stage2_config = Stage2Config(**stage2_config_dict)
+            stage2_config=Stage2Config(**stage2_config_dict)
             result=orch.analyze(
                 apk_path,
                 prev_apk_path=prev_path,
@@ -117,13 +111,10 @@ def run_analysis_cached(apk_bytes:bytes,prev_bytes:bytes|None,skip_llm:bool,stag
             return result,""
         except Exception as exc:
             return None,str(exc)
-
-
-
 def render_sidebar()->tuple:
     """Render the sidebar and return inputs and config."""
     with st.sidebar:
-        st.markdown("## 🔮 ORACLE-TMF")
+        st.markdown("## ORACLE-TMF")
         st.markdown(
             "<small style='color:#8888aa'>Temporal Mutation Forecaster<br>"
             "PSB CyberShield 2026</small>",
@@ -131,49 +122,49 @@ def render_sidebar()->tuple:
         )
         st.divider()
         uploaded=st.file_uploader(
-            "📦 Upload Target APK",
+            "Upload Target APK",
             type=["apk"],
             help="Android APK file (max 100 MB)",
         )
         prev_uploaded=st.file_uploader(
-            "📦 Previous Version (optional)",
+            "Previous Version (optional)",
             type=["apk"],
             help="Upload v_n-1 to enable Stage I version diff and MVV",
         )
         st.divider()
         deobf=st.select_slider(
-            "🔓 Deobfuscation Level",
+            "Deobfuscation Level",
             options=["None","Fast","Deep"],
             value="Fast",
             help="None=raw Smali, Fast=TMF-REFLECT only, Deep=TMF-REFLECT+Frida hooks",
         )
         skip_llm=st.checkbox(
-            "⚡ Static Only (skip LLM agents)",
+            "Static Only (skip LLM agents)",
             value=False,
             help="Run stages A-H only. Much faster, no API costs, no forecasts.",
         )
         st.divider()
-        st.markdown("### ⚙️ Stage 2 Configuration")
-        stage2_nav = st.checkbox("Stage N: NAV Analysis", value=True, help="Adjust Stage K confidence")
-        stage2_kinship = st.checkbox("Stage P: KINSHIP Fingerprinting", value=True, help="Builder DNA")
-        stage2_mirage = st.checkbox("Stage Q: MIRAGE Robustness", value=True, help="Pipeline robustness scoring")
-        stage2_network = st.checkbox("Network Attack Analysis", value=True, help="DDoS/ANC signature detection")
-        stage2_cabal = st.checkbox("Stage O: CABAL Collusion", value=False, help="Requires >= 2 APKs in mag_list")
-        stage2_phantom = st.checkbox("Stage M: PHANTOM Detonation", value=False, help="Requires air-gapped lab + rooted device")
-        stage2_ouroboros = st.checkbox("Stage R: OUROBOROS", value=False, help="Research/training mode only")
-        stage2_config_dict = {
-            "nav_enabled": stage2_nav,
-            "kinship_enabled": stage2_kinship,
-            "mirage_enabled": stage2_mirage,
-            "network_attack_enabled": stage2_network,
-            "cabal_enabled": stage2_cabal,
-            "phantom_enabled": stage2_phantom,
-            "ouroboros_enabled": stage2_ouroboros,
-            "save_json_reports": False
+        st.markdown("### Stage 2 Configuration")
+        stage2_nav=st.checkbox("Stage N: NAV Analysis",value=True,help="Adjust Stage K confidence")
+        stage2_kinship=st.checkbox("Stage P: KINSHIP Fingerprinting",value=True,help="Builder DNA")
+        stage2_mirage=st.checkbox("Stage Q: MIRAGE Robustness",value=True,help="Pipeline robustness scoring")
+        stage2_network=st.checkbox("Network Attack Analysis",value=True,help="DDoS/ANC signature detection")
+        stage2_cabal=st.checkbox("Stage O: CABAL Collusion",value=False,help="Requires >= 2 APKs in mag_list")
+        stage2_phantom=st.checkbox("Stage M: PHANTOM Detonation",value=False,help="Requires air-gapped lab + rooted device")
+        stage2_ouroboros=st.checkbox("Stage R: OUROBOROS",value=False,help="Research/training mode only")
+        stage2_config_dict={
+            "nav_enabled":stage2_nav,
+            "kinship_enabled":stage2_kinship,
+            "mirage_enabled":stage2_mirage,
+            "network_attack_enabled":stage2_network,
+            "cabal_enabled":stage2_cabal,
+            "phantom_enabled":stage2_phantom,
+            "ouroboros_enabled":stage2_ouroboros,
+            "save_json_reports":False
         }
         st.divider()
         run_btn=st.button(
-            "🔍  ANALYZE APK",
+            "ANALYZE APK",
             type="primary",
             use_container_width=True,
             disabled=(uploaded is None),
@@ -186,45 +177,38 @@ def render_sidebar()->tuple:
             unsafe_allow_html=True,
         )
     return uploaded,prev_uploaded,deobf,skip_llm,run_btn,stage2_config_dict
-
-
-
 def render_overview(result):
     mag=result.mag
-    
-    st.markdown("### 📋 APK Intelligence Card")
+    st.markdown("### APK Intelligence Card")
     m=mag.apk_metadata
     col_a,col_b,col_c=st.columns(3)
     with col_a:
-        st.metric("Package Name",m.package_name or "—")
-        st.metric("Version",f"{m.version_name} (code {m.version_code})"if m.version_name else "—")
+        st.metric("Package Name",m.package_name or "-")
+        st.metric("Version",f"{m.version_name}(code{m.version_code})"if m.version_name else "-")
         st.metric("Family",mag.malware_family or "UNKNOWN")
     with col_b:
-        st.metric("SHA-256 (first 16)",m.sha256[:16]+"…"if m.sha256 else "—")
-        st.metric("File Size",f"{m.file_size_bytes/1024:.1f} KB"if m.file_size_bytes else "—")
-        st.metric("Packed?","⚠️ YES — "+m.packer_hint if m.is_packed else "No")
+        st.metric("SHA-256 (first 16)",m.sha256[:16]+"..."if m.sha256 else "-")
+        st.metric("File Size",f"{m.file_size_bytes/1024:.1f}KB"if m.file_size_bytes else "-")
+        st.metric("Packed?","YES - "+m.packer_hint if m.is_packed else "No")
     with col_c:
-        st.metric("Min SDK",str(m.min_sdk)if m.min_sdk else "—")
-        st.metric("Target SDK",str(m.target_sdk)if m.target_sdk else "—")
-        st.metric("Analysis Time",f"{result.total_time_ms/1000:.1f} s")
-    
-    if getattr(result, "stage2_report", None) is not None:
+        st.metric("Min SDK",str(m.min_sdk)if m.min_sdk else "-")
+        st.metric("Target SDK",str(m.target_sdk)if m.target_sdk else "-")
+        st.metric("Analysis Time",f"{result.total_time_ms/1000:.1f}s")
+    if getattr(result,"stage2_report",None)is not None:
         st.divider()
-        st.markdown("### 🧬 Stage 2 Intelligence Products")
-        s2 = result.stage2_report
-        c1, c2, c3, c4 = st.columns(4)
+        st.markdown("### Stage 2 Intelligence Products")
+        s2=result.stage2_report
+        c1,c2,c3,c4=st.columns(4)
         with c1:
-            st.metric("NAV Redirection", s2.nav_redirection or "—")
+            st.metric("NAV Redirection",s2.nav_redirection or "-")
         with c2:
-            st.metric("MIRAGE Robustness", f"{s2.robustness_score:.2f}")
+            st.metric("MIRAGE Robustness",f"{s2.robustness_score:.2f}")
         with c3:
-            st.metric("Highest DDoS Threat", s2.highest_ddos_threat)
+            st.metric("Highest DDoS Threat",s2.highest_ddos_threat)
         with c4:
-            st.metric("Builder Cluster ID", str(s2.builder_cluster_id) if s2.builder_cluster_id != -1 else "—")
-            
+            st.metric("Builder Cluster ID",str(s2.builder_cluster_id)if s2.builder_cluster_id!=-1 else "-")
     st.divider()
-    
-    st.markdown("### 🔬 Mutation Artifact Inventory — 7-Class Taxonomy")
+    st.markdown("### Mutation Artifact Inventory - 7-Class Taxonomy")
     counts=mag.artifact_class_counts()
     labels=[
         ("CLASS 1\nDead Code","dead_code","#5588ff"),
@@ -237,7 +221,6 @@ def render_overview(result):
     ]
     gauge_cols=st.columns(7)
     for col,(label,cls_key,color)in zip(gauge_cols,labels):
-        
         mapping={
             "dead_code":len(mag.dead_code),
             "unused_permissions":len(mag.unused_permissions),
@@ -254,44 +237,38 @@ def render_overview(result):
                 st.plotly_chart(fig,use_container_width=True,config={"displayModeBar":False})
             else:
                 st.metric(label.replace("\n"," "),val)
-    
     passed=mag.high_confidence_forecasts()
     st.divider()
     if passed:
         best=passed[0]
         st.success(
-            f"🎯 **{len(passed)} High-Confidence Forecast(s) Generated**  |  "
-            f"Top prediction: **{best.predicted_technique}** ({best.technique_name})  |  "
-            f"Confidence: **{best.confidence_score:.3f}**"
+            f"**{len(passed)}High-Confidence Forecast(s)Generated**|"
+            f"Top prediction:**{best.predicted_technique}**({best.technique_name})|"
+            f"Confidence:**{best.confidence_score:.3f}**"
         )
     elif mag.forecasts:
         st.warning(
-            f"⚠️ {len(mag.forecasts)} forecast(s) generated but confidence < "
-            f"{0.72} gate threshold. Consider enriching the RAG knowledge base."
+            f"{len(mag.forecasts)}forecast(s)generated but confidence<"
+            f"{0.72}gate threshold.Consider enriching the RAG knowledge base."
         )
     else:
-        st.info("ℹ️ No LLM forecasts generated. Run with LLM enabled for predictions.")
-    
+        st.info("No LLM forecasts generated. Run with LLM enabled for predictions.")
     if mag.stage_errors:
-        with st.expander(f"⚠️ {len(mag.stage_errors)} Stage Error(s)",expanded=False):
+        with st.expander(f"{len(mag.stage_errors)}Stage Error(s)",expanded=False):
             for stage,err in mag.stage_errors.items():
-                st.error(f"**{escaped(stage)}**: {escaped(err)}")
-
-
-
+                st.error(f"**{escaped(stage)}**:{escaped(err)}")
 def render_artifacts(result):
     mag=result.mag
-    st.markdown("### 🔬 Detected Mutation Artifacts")
-    
-    with st.expander(f"🔵 CLASS 1 — Dead Code / Unreachable Methods  ({len(mag.dead_code)})",expanded=bool(mag.dead_code)):
+    st.markdown("### Detected Mutation Artifacts")
+    with st.expander(f"CLASS 1-Dead Code/Unreachable Methods({len(mag.dead_code)})",expanded=bool(mag.dead_code)):
         if not mag.dead_code:
             st.info("No dead code artifacts detected.")
         else:
             for i,a in enumerate(mag.dead_code[:20],1):
                 dte_chip=_dte_chip(a.dte_label.value if hasattr(a.dte_label,"value")else str(a.dte_label))
                 st.markdown(
-                    f"**#{i}** `{escaped(a.class_name)}` → `{escaped(a.method_name[:60])}`  "
-                    f"{dte_chip}  conf={a.dte_confidence:.2f}  opcodes={a.opcode_count}",
+                    f"**#{i}**`{escaped(a.class_name)}`->`{escaped(a.method_name[:60])}`  "
+                    f"{dte_chip}conf={a.dte_confidence:.2f}opcodes={a.opcode_count}",
                     unsafe_allow_html=True,
                 )
                 col_smali,col_java=st.columns(2)
@@ -302,82 +279,71 @@ def render_artifacts(result):
                     st.markdown("**Pseudo-Java (Agent 1)**")
                     st.code(a.pseudo_java[:800]if a.pseudo_java else "(run with LLM enabled)",language="java")
                 st.divider()
-    
-    with st.expander(f"🟠 CLASS 2 — Unused Permission Intents  ({len(mag.unused_permissions)})",expanded=bool(mag.unused_permissions)):
+    with st.expander(f"CLASS 2-Unused Permission Intents({len(mag.unused_permissions)})",expanded=bool(mag.unused_permissions)):
         if not mag.unused_permissions:
             st.info("No unused permission artifacts detected.")
         else:
             data=[{"Permission":a.permission_name,"Group":a.android_permission_group,"Context":a.context_note[:80]}
                     for a in mag.unused_permissions]
             st.table(data)
-    
-    with st.expander(f"🟡 CLASS 3 — Placeholder Strings & Resources  ({len(mag.placeholder_strings)})",expanded=False):
+    with st.expander(f"CLASS 3-Placeholder Strings&Resources({len(mag.placeholder_strings)})",expanded=False):
         if not mag.placeholder_strings:
             st.info("No placeholder string artifacts detected.")
         else:
             for a in mag.placeholder_strings[:15]:
-                st.code(f'[{a.matched_pattern or "high-entropy"}] entropy={a.entropy:.2f}  "{a.value[:100]}"',language="text")
-    
-    with st.expander(f"🔴 CLASS 4 — C2 Endpoint Stubs  ({len(mag.c2_stubs)})",expanded=bool(mag.c2_stubs)):
+                st.code(f'[{a.matched_pattern or "high-entropy"}]entropy={a.entropy:.2f}"{a.value[:100]}"',language="text")
+    with st.expander(f"CLASS 4-C2 Endpoint Stubs({len(mag.c2_stubs)})",expanded=bool(mag.c2_stubs)):
         if not mag.c2_stubs:
             st.info("No C2 stub artifacts detected.")
         else:
             for a in mag.c2_stubs[:10]:
-                st.markdown(f"**Class**: `{a.class_name}`  **Framework**: `{a.framework}`")
+                st.markdown(f"**Class**:`{a.class_name}`**Framework**:`{a.framework}`")
                 if a.extracted_url:
-                    st.markdown(f"🌐 **URL**: `{a.extracted_url}`")
+                    st.markdown(f"**URL**:`{a.extracted_url}`")
                 if a.http_method:
-                    st.markdown(f"📡 **Method**: `{a.http_method}`")
+                    st.markdown(f"**Method**:`{a.http_method}`")
                 st.divider()
-    
-    with st.expander(f"🟣 CLASS 5 — Partial API Implementations  ({len(mag.partial_apis)})",expanded=False):
+    with st.expander(f"CLASS 5-Partial API Implementations({len(mag.partial_apis)})",expanded=False):
         if not mag.partial_apis:
             st.info("No partial API artifacts detected.")
         else:
             for a in mag.partial_apis:
                 st.markdown(
-                    f"**Class**: `{a.class_name}`  "
-                    f"**Extends**: `{a.interface_extended.split('/')[-1]}`  "
-                    f"**Stubs**: `{'`, `'.join(a.method_stubs)}`"
+                    f"**Class**:`{a.class_name}`  "
+                    f"**Extends**:`{a.interface_extended.split('/')[-1]}`  "
+                    f"**Stubs**:`{'`, `'.join(a.method_stubs)}`"
                 )
-    
-    with st.expander(f"🟢 CLASS 6 — Unfinished UI Flows  ({len(mag.unfinished_ui_flows)})",expanded=bool(mag.unfinished_ui_flows)):
+    with st.expander(f"CLASS 6-Unfinished UI Flows({len(mag.unfinished_ui_flows)})",expanded=bool(mag.unfinished_ui_flows)):
         if not mag.unfinished_ui_flows:
             st.info("No orphaned UI layout artifacts detected.")
         else:
             for a in mag.unfinished_ui_flows:
-                color="🔴"if "phishing"in a.suspected_type or "credential"in a.suspected_type else "🟡"
+                color="HIGH"if "phishing"in a.suspected_type or "credential"in a.suspected_type else "MED"
                 st.markdown(
-                    f"{color} `{a.layout_file}`  **Type**: `{a.suspected_type}`  "
-                    f"**Assets**: `{', '.join(a.asset_refs[:3])}`"
+                    f"{color}`{a.layout_file}`**Type**:`{a.suspected_type}`  "
+                    f"**Assets**:`{', '.join(a.asset_refs[:3])}`"
                 )
-    
-    with st.expander(f"🌸 CLASS 7 — GenAI API Scaffolds (TMF-Psi)  ({len(mag.genai_scaffolds)})",expanded=bool(mag.genai_scaffolds)):
+    with st.expander(f"CLASS 7-GenAI API Scaffolds(TMF-Psi)({len(mag.genai_scaffolds)})",expanded=bool(mag.genai_scaffolds)):
         if not mag.genai_scaffolds:
             st.info("No GenAI API scaffold artifacts detected.")
         else:
             for a in mag.genai_scaffolds:
                 st.warning(
-                    f"⚠️ **AI-Augmented Malware Scaffold Detected!**  "
-                    f"Provider: **{escaped(a.provider)}**  |  Model: `{escaped(a.model_hint or 'unknown')}`  "
-                    f"|  Endpoint: `{escaped(a.api_endpoint[:60])}`"
+                    f"**AI-Augmented Malware Scaffold Detected**"
+                    f"Provider:**{escaped(a.provider)}**|Model:`{escaped(a.model_hint or 'unknown')}`  "
+                    f"|Endpoint:`{escaped(a.api_endpoint[:60])}`"
                 )
-                st.markdown(f"**Class**: `{escaped(a.class_name)}` → `{escaped(a.method_name[:60])}`")
+                st.markdown(f"**Class**:`{escaped(a.class_name)}`->`{escaped(a.method_name[:60])}`")
                 st.divider()
-
-
-
 def render_forecasts(result):
     mag=result.mag
-    st.markdown("### 🎯 Evolutionary Mutation Forecasts")
-    
-    st.markdown("#### 🌌 Evolutionary Mutation Timeline")
+    st.markdown("### Evolutionary Mutation Forecasts")
+    st.markdown("#### Evolutionary Mutation Timeline")
     if _PLOTLY_OK:
         fig=_make_evolutionary_timeline(mag)
         st.plotly_chart(fig,use_container_width=True,config={"displayModeBar":False})
     else:
         st.info("Install plotly for the interactive evolutionary timeline.")
-    
     passed=mag.high_confidence_forecasts()
     if not passed:
         if mag.forecasts:
@@ -389,9 +355,9 @@ def render_forecasts(result):
         else:
             st.info(
                 "No forecasts available. Ensure:\n"
-                "• ANTHROPIC_API_KEY is set\n"
-                "• 'Static Only' checkbox is unchecked\n"
-                "• Artifacts were detected in Stages D/E/G/H"
+                " ANTHROPIC_API_KEY is set\n"
+                " 'Static Only' checkbox is unchecked\n"
+                " Artifacts were detected in Stages D/E/G/H"
             )
             return
     for i,f in enumerate(passed,1):
@@ -403,7 +369,7 @@ def render_forecasts(result):
             col_score,col_detail=st.columns([1,3])
             with col_score:
                 st.markdown(
-                    f"<div class='confidence-label'>C = {f.confidence_score:.3f}</div>",
+                    f"<div class='confidence-label'>C={f.confidence_score:.3f}</div>",
                     unsafe_allow_html=True,
                 )
                 color="#00ff64"if f.confidence_score>0.80 else "#ffcc00"if f.confidence_score>0.65 else "#ff4444"
@@ -411,68 +377,148 @@ def render_forecasts(result):
                     fig_c=_make_confidence_breakdown(f)
                     st.plotly_chart(fig_c,use_container_width=True,config={"displayModeBar":False})
             with col_detail:
-                st.markdown(f"**#{i} Prediction: {escaped(f.predicted_technique)}**")
-                st.markdown(f"🎯 **Tactic**: `{escaped(f.predicted_tactic)}`  |  **Technique**: `{escaped(f.predicted_technique)}` — *{escaped(f.technique_name)}*")
+                st.markdown(f"**#{i}Prediction:{escaped(f.predicted_technique)}**")
+                st.markdown(f"**Tactic**:`{escaped(f.predicted_tactic)}`|**Technique**:`{escaped(f.predicted_technique)}`*{escaped(f.technique_name)}*")
                 if f.predicted_target_institutions:
-                    safe_insts=', '.join(escaped(t) for t in f.predicted_target_institutions[:3])
-                    st.markdown(f"🏦 **Target Institutions**: {safe_insts}")
+                    safe_insts=', '.join(escaped(t)for t in f.predicted_target_institutions[:3])
+                    st.markdown(f"**Target Institutions**:{safe_insts}")
                 if f.predicted_target_countries:
-                    safe_countries=', '.join(escaped(c) for c in f.predicted_target_countries[:5])
-                    st.markdown(f"🌍 **Target Countries**: {safe_countries}")
+                    safe_countries=', '.join(escaped(c)for c in f.predicted_target_countries[:5])
+                    st.markdown(f"**Target Countries**:{safe_countries}")
                 if f.rationale:
-                    with st.expander("📖 Model Evidence Summary"):
+                    with st.expander("Model Evidence Summary"):
                         st.markdown(escaped(f.rationale[:800]))
                 st.markdown(
-                    f"**Bayesian Decomposition**:  "
-                    f"P_LLM={f.p_llm:.3f} × 0.45  +  "
-                    f"D={f.artifact_density:.3f} × MVV={f.mvv_normalized:.3f} × 0.35  +  "
-                    f"H_prior={f.h_prior:.3f} × 0.20"
+                    f"**Bayesian Decomposition**:"
+                    f"P_LLM={f.p_llm:.3f}x 0.45+"
+                    f"D={f.artifact_density:.3f}x MVV={f.mvv_normalized:.3f}x 0.35+"
+                    f"H_prior={f.h_prior:.3f}x 0.20"
                 )
             st.markdown("</div>",unsafe_allow_html=True)
-
-
-
+def render_research(result):
+    mag=result.mag
+    rr=getattr(mag,"research_readiness",None)
+    st.markdown("### Research Readiness & Publication Pack")
+    if rr is None:
+        st.warning("Research readiness was not generated for this run.")
+        return
+    c1,c2,c3,c4,c5=st.columns(5)
+    with c1:
+        st.metric("Publication",f"{rr.publication_readiness_score:.2f}",rr.paper_readiness)
+    with c2:
+        st.metric("Evidence",f"{rr.evidence_strength_score:.2f}")
+    with c3:
+        st.metric("Novelty",f"{rr.novelty_score:.2f}")
+    with c4:
+        st.metric("Reproducibility",f"{rr.reproducibility_score:.2f}")
+    with c5:
+        st.metric("Risk Tier",rr.risk_tier)
+    if rr.headline_claim:
+        st.info(escaped(rr.headline_claim))
+    st.divider()
+    st.markdown("#### Evidence Matrix")
+    if rr.evidence_matrix:
+        st.dataframe(rr.evidence_matrix,use_container_width=True,hide_index=True)
+    else:
+        st.info("No evidence matrix rows available.")
+    st.markdown("#### Stage 2 Fusion")
+    s2_summary=getattr(mag,"stage2_intelligence",None)
+    s2=getattr(result,"stage2_report",None)
+    if s2_summary is not None and getattr(s2_summary,"available",False):
+        s2a,s2b,s2c,s2d,s2e=st.columns(5)
+        with s2a:
+            st.metric("NAV",s2_summary.nav_redirection or "none")
+        with s2b:
+            st.metric("Builder Cluster",str(s2_summary.builder_cluster_id)if s2_summary.builder_cluster_id!=-1 else "none")
+        with s2c:
+            st.metric("Robustness",f"{s2_summary.robustness_score:.2f}")
+        with s2d:
+            st.metric("Network Threat",s2_summary.highest_network_threat)
+        with s2e:
+            st.metric("Detection Rules",str(s2_summary.suricata_rules_count))
+        st.caption(f"Safety mode:{escaped(s2_summary.safety_mode)}")
+    elif s2 is not None:
+        s2a,s2b,s2c,s2d=st.columns(4)
+        with s2a:
+            st.metric("NAV",s2.nav_redirection or "none")
+        with s2b:
+            st.metric("Builder Cluster",str(s2.builder_cluster_id)if s2.builder_cluster_id!=-1 else "none")
+        with s2c:
+            st.metric("Robustness",f"{s2.robustness_score:.2f}")
+        with s2d:
+            st.metric("Network Threat",s2.highest_ddos_threat)
+    else:
+        st.info("Stage 2 report was not available for this run.")
+    st.divider()
+    left,right=st.columns(2)
+    with left:
+        st.markdown("#### Key Findings")
+        for item in rr.key_findings:
+            st.markdown(f"-{escaped(item)}")
+        st.markdown("#### Limitations")
+        for item in rr.limitations:
+            st.markdown(f"-{escaped(item)}")
+    with right:
+        st.markdown("#### Recommended Next Steps")
+        for item in rr.recommended_next_steps:
+            st.markdown(f"-{escaped(item)}")
+        st.markdown("#### Reproducibility")
+        for item in rr.reproducibility_checklist:
+            status="pass" if item.get("passed")else "missing"
+            st.markdown(f"-`{status}`{escaped(item.get('item',''))}")
+    bundle=result.report_bundle
+    if bundle and getattr(bundle,"paper_md_path","")and os.path.isfile(bundle.paper_md_path):
+        st.divider()
+        with open(bundle.paper_md_path,"rb")as f:
+            st.download_button("Download Research Paper Draft",f.read(),"oracle_tmf_research_paper.md","text/markdown")
 def render_export(result):
     mag=result.mag
     bundle=result.report_bundle
-    st.markdown("### 📤 Export Intelligence Products")
-    col_j,col_y,col_s,col_p=st.columns(4)
+    st.markdown("### Export Intelligence Products")
+    col_j,col_y,col_s,col_p,col_m=st.columns(5)
     with col_j:
-        st.markdown("#### 📄 JSON Report")
+        st.markdown("#### JSON Report")
         st.markdown("Full MAG + executive summary (SIEM-ready)")
         if bundle and bundle.json_path and os.path.isfile(bundle.json_path):
             with open(bundle.json_path,"rb")as f:
-                st.download_button("⬇️ Download JSON",f.read(),"oracle_tmf_report.json","application/json")
+                st.download_button("Download JSON",f.read(),"oracle_tmf_report.json","application/json")
         else:
-            
             json_data=mag.to_json().encode()
-            st.download_button("⬇️ Download MAG JSON",json_data,"oracle_tmf_mag.json","application/json")
+            st.download_button("Download MAG JSON",json_data,"oracle_tmf_mag.json","application/json")
     with col_y:
-        st.markdown("#### 📋 YARA Rules")
+        st.markdown("#### YARA Rules")
         st.markdown("Proactive detection signatures for v_{n+1}")
         if bundle and bundle.yara_path and os.path.isfile(bundle.yara_path):
             with open(bundle.yara_path,"rb")as f:
-                st.download_button("⬇️ Download YARA",f.read(),"oracle_tmf_forecast.yar","text/plain")
+                st.download_button("Download YARA",f.read(),"oracle_tmf_forecast.yar","text/plain")
         else:
             st.info("YARA file not generated (check Stage L errors)")
     with col_s:
-        st.markdown("#### 🌐 STIX 2.1 Bundle")
+        st.markdown("#### STIX 2.1 Bundle")
         st.markdown("TAXII-compatible threat intelligence feed")
         if bundle and bundle.stix_path and os.path.isfile(bundle.stix_path):
             with open(bundle.stix_path,"rb")as f:
-                st.download_button("⬇️ Download STIX",f.read(),"oracle_tmf_stix.json","application/json")
+                st.download_button("Download STIX",f.read(),"oracle_tmf_stix.json","application/json")
         else:
             st.info("STIX file not generated (install stix2: pip install stix2)")
     with col_p:
-        st.markdown("#### 📰 PDF Intelligence Brief")
+        st.markdown("#### PDF Intelligence Brief")
         st.markdown("Human-readable SOC analyst report")
         if bundle and bundle.pdf_path and os.path.isfile(bundle.pdf_path):
             with open(bundle.pdf_path,"rb")as f:
-                st.download_button("⬇️ Download PDF",f.read(),"oracle_tmf_brief.pdf","application/pdf")
+                st.download_button("Download PDF",f.read(),"oracle_tmf_brief.pdf","application/pdf")
         else:
             st.info("PDF not generated (install fpdf2: pip install fpdf2)")
+    with col_m:
+        st.markdown("#### Research Paper Draft")
+        st.markdown("Markdown case-study draft with methods and limitations")
+        if bundle and getattr(bundle,"paper_md_path","")and os.path.isfile(bundle.paper_md_path):
+            with open(bundle.paper_md_path,"rb")as f:
+                st.download_button("Download Paper MD",f.read(),"oracle_tmf_research_paper.md","text/markdown")
+        else:
+            st.info("Paper draft not generated")
     st.divider()
-    st.markdown("#### 📊 Pipeline Timing Breakdown")
+    st.markdown("#### Pipeline Timing Breakdown")
     if mag.stage_timings_ms:
         if _PLOTLY_OK:
             stages=list(mag.stage_timings_ms.keys())
@@ -495,10 +541,7 @@ def render_export(result):
             st.plotly_chart(fig,use_container_width=True)
         else:
             for s,t in mag.stage_timings_ms.items():
-                st.text(f"{s:<25} {t:>8.1f} ms {'❌'if s in mag.stage_errors else '✓'}")
-
-
-
+                st.text(f"{s:<25}{t:>8.1f}ms{'FAIL'if s in mag.stage_errors else 'OK'}")
 def _make_gauge(value:int,max_val:int,title:str,color:str):
     """Compact gauge chart for a single artifact class."""
     fig=go.Figure(go.Indicator(
@@ -523,30 +566,27 @@ def _make_gauge(value:int,max_val:int,title:str,color:str):
     return fig
 def _make_evolutionary_timeline(mag):
     """
-    The Wow Factor — Evolutionary Mutation Timeline.
+    The Wow Factor  Evolutionary Mutation Timeline.
     Three nodes connected by a dotted arrow:
-      v_n-1 (Historical/dim)  →  v_n (Current/bright)  →  v_n+1 (Predicted/glowing)
+      v_n-1 (Historical/dim)    v_n (Current/bright)    v_n+1 (Predicted/glowing)
     """
     fig=go.Figure()
-    
     fig.update_layout(
         paper_bgcolor="#0d0d1a",
         plot_bgcolor="#0d0d1a",
         height=320,
         margin=dict(l=30,r=30,t=60,b=40),
-        title=dict(text="⟨ Evolutionary Mutation Timeline ⟩",font=dict(color="#00f5ff",size=14),x=0.5),
+        title=dict(text=" Evolutionary Mutation Timeline ",font=dict(color="#00f5ff",size=14),x=0.5),
         showlegend=False,
         xaxis=dict(range=[-0.7,2.7],showgrid=False,zeroline=False,showticklabels=False),
         yaxis=dict(range=[-1.2,1.8],showgrid=False,zeroline=False,showticklabels=False),
     )
-    
     for x0,x1 in[(0.15,0.85),(1.15,1.85)]:
         fig.add_shape(type="line",x0=x0,y0=0,x1=x1,y1=0,
                       line=dict(color="#00f5ff55",width=2,dash="dot"))
         fig.add_annotation(x=x1,y=0,xref="x",yref="y",
                            showarrow=True,arrowhead=2,arrowcolor="#00f5ff88",
                            arrowsize=1.5,arrowwidth=2,ax=-20,ay=0)
-    
     fig.add_trace(go.Scatter(
         x=[0],y=[0],mode="markers",
         marker=dict(size=90,color="rgba(40,40,80,0.6)",line=dict(color="#33336688",width=3)),
@@ -556,48 +596,45 @@ def _make_evolutionary_timeline(mag):
                        showarrow=False,font=dict(color="#8888bb",size=12),yshift=0)
     fig.add_annotation(x=0,y=-0.85,text="<span style='font-size:9px;color:#555577'>Previous Version</span>",
                        showarrow=False,font=dict(color="#555577",size=9))
-    
     total_arts=mag.total_artifact_count()
     import html as _html
-    family=_html.escape(mag.malware_family or "UNKNOWN")  # V-015: escape APK-derived string
+    family=_html.escape(mag.malware_family or "UNKNOWN")
     fig.add_trace(go.Scatter(
         x=[1],y=[0],mode="markers",
         marker=dict(size=115,color="rgba(0,40,100,0.8)",line=dict(color="#00f5ff",width=5)),
         hovertemplate=(
-            f"<b>v_n — {family}</b><br>"
-            f"Total artifacts: {total_arts}<br>"
-            f"Dead code: {len(mag.dead_code)}<br>"
-            f"Unused perms: {len(mag.unused_permissions)}<br>"
-            f"C2 stubs: {len(mag.c2_stubs)}<extra></extra>"
+            f"<b>v_n{family}</b><br>"
+            f"Total artifacts:{total_arts}<br>"
+            f"Dead code:{len(mag.dead_code)}<br>"
+            f"Unused perms:{len(mag.unused_permissions)}<br>"
+            f"C2 stubs:{len(mag.c2_stubs)}<extra></extra>"
         ),
     ))
     fig.add_annotation(x=1,y=0,text=f"<b>v_n</b><br><span style='font-size:10px'>{family}</span>",
                        showarrow=False,font=dict(color="#00f5ff",size=13))
     fig.add_annotation(x=1,y=-0.85,
-                       text=f"<span style='font-size:9px;color:#00f5ff88'>{total_arts} artifacts</span>",
+                       text=f"<span style='font-size:9px;color:#00f5ff88'>{total_arts}artifacts</span>",
                        showarrow=False,font=dict(color="#00f5ff88",size=9))
-    
     passed=mag.high_confidence_forecasts()
     if passed:
         fc=passed[0]
         import html as _html
-        # V-015: Escape all APK/LLM-derived strings before inserting into HTML-capable Plotly fields
         tech_short=_html.escape(str(fc.predicted_technique))
         tactic_safe=_html.escape(str(fc.predicted_tactic))
         tech_name_safe=_html.escape(str(fc.technique_name))
         conf_txt=f"C={fc.confidence_score:.2f}"
         hover_txt=(
-            f"<b>v_n+1 — PREDICTED</b><br>"
-            f"Technique: {tech_short}<br>"
+            f"<b>v_n+1  PREDICTED</b><br>"
+            f"Technique:{tech_short}<br>"
             f"{tech_name_safe}<br>"
-            f"Confidence: {fc.confidence_score:.3f}<br>"
-            f"Tactic: {tactic_safe}<extra></extra>"
+            f"Confidence:{fc.confidence_score:.3f}<br>"
+            f"Tactic:{tactic_safe}<extra></extra>"
         )
         node_text=f"<b>v_n+1</b><br><span style='font-size:10px'>{tech_short}</span>"
         node_color="rgba(0,80,20,0.5)"
         line_color="#00ff64"
         anno_color="#00ff64"
-        sub_text=f"<span style='font-size:9px;color:#00ff6488'>{conf_txt} ✓ FORECAST</span>"
+        sub_text=f"<span style='font-size:9px;color:#00ff6488'>{conf_txt}FORECAST</span>"
     else:
         hover_txt="<b>v_n+1</b><br>No high-confidence forecast<extra></extra>"
         node_text="<b>v_n+1</b><br><span style='font-size:10px;color:#555577'>Pending</span>"
@@ -614,14 +651,13 @@ def _make_evolutionary_timeline(mag):
                        font=dict(color=anno_color,size=13))
     fig.add_annotation(x=2,y=-0.85,text=sub_text,showarrow=False,
                        font=dict(color=anno_color,size=9))
-    
-    for x_pos,label in[(0,"v_n-1"),(1,"v_n ← You Are Here"),(2,"v_n+1 ← PREDICTED")]:
+    for x_pos,label in[(0,"v_n-1"),(1,"v_n  You Are Here"),(2,"v_n+1  PREDICTED")]:
         fig.add_annotation(x=x_pos,y=1.35,text=f"<span style='font-size:8px'>{label}</span>",
                            showarrow=False,font=dict(color="#555577",size=8))
     return fig
 def _make_confidence_breakdown(fc):
     """Horizontal bar chart showing Bayesian confidence components."""
-    components=["P_LLM × 0.45","D × MVV × 0.35","H_prior × 0.20"]
+    components=["P_LLM  0.45","D  MVV  0.35","H_prior  0.20"]
     values=[
         fc.p_llm*0.45,
         fc.artifact_density*fc.mvv_normalized*0.35,
@@ -641,9 +677,6 @@ def _make_confidence_breakdown(fc):
         font=dict(color="#e8e8f0",size=9),
     )
     return fig
-
-
-
 def _dte_chip(label:str)->str:
     """Return coloured HTML chip for a DTE classification label."""
     import html as _html
@@ -656,42 +689,32 @@ def _dte_chip(label:str)->str:
     safe_label=_html.escape(str(label))
     css=cls_map.get(label,"chip-remnant")
     return f'<span class="{css}">{safe_label}</span>'
-
-
-
 def main()->None:
-    
     st.markdown(
-        "<h1 style='text-align:center;letter-spacing:-0.03em;'>🔮 ORACLE-TMF</h1>"
+        "<h1 style='text-align:center;letter-spacing:-0.03em;'> ORACLE-TMF</h1>"
         "<p style='text-align:center;color:#8888aa;margin-top:-12px;'>"
-        "Observational Reasoning and Coercive Analysis for Latent Evolution — "
+        "Observational Reasoning and Coercive Analysis for Latent Evolution  "
         "Temporal Mutation Forecaster</p>",
         unsafe_allow_html=True,
     )
-    
     uploaded,prev_uploaded,deobf,skip_llm,run_btn,stage2_config_dict=render_sidebar()
-    
     if "analysis_result"not in st.session_state:
         st.session_state.analysis_result=None
     if "analysis_error"not in st.session_state:
         st.session_state.analysis_error=""
-    
     if run_btn and uploaded:
         apk_bytes=uploaded.read()
         prev_bytes=prev_uploaded.read()if prev_uploaded else None
-        with st.spinner(f"⚙️ Running ORACLE-TMF pipeline with Stage 2…"):
+        with st.spinner("Running ORACLE-TMF pipeline with Stage 2..."):
             result,err=run_analysis_cached(apk_bytes,prev_bytes,skip_llm,stage2_config_dict)
         st.session_state.analysis_result=result
         st.session_state.analysis_error=err
         if err:
-            # V-023: Do not expose internal exception details to the UI.
-            # Log the full error internally; show a generic message to the analyst.
             import logging as _logging
-            _logging.getLogger(__name__).error("Analysis pipeline error: %s", err)
+            _logging.getLogger(__name__).error("Analysis pipeline error: %s",err)
             st.error("Analysis failed. Check server logs for details.")
         elif result and result.success:
-            st.success(f"✅ Analysis complete in {result.total_time_ms/1000:.1f}s")
-    
+            st.success(f"Analysis complete in{result.total_time_ms/1000:.1f}s")
     result=st.session_state.analysis_result
     if result is None:
         st.markdown(
@@ -702,9 +725,8 @@ def main()->None:
             unsafe_allow_html=True,
         )
         return
-    
-    tab_overview,tab_artifacts,tab_forecasts,tab_export=st.tabs([
-        "📊 Overview","🔬 Artifacts","🎯 Forecasts","📤 Export",
+    tab_overview,tab_artifacts,tab_forecasts,tab_research,tab_export=st.tabs([
+        "Overview","Artifacts","Forecasts","Research","Export",
     ])
     with tab_overview:
         render_overview(result)
@@ -712,6 +734,8 @@ def main()->None:
         render_artifacts(result)
     with tab_forecasts:
         render_forecasts(result)
+    with tab_research:
+        render_research(result)
     with tab_export:
         render_export(result)
 if __name__=="__main__":

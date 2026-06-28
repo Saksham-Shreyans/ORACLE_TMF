@@ -36,9 +36,9 @@ import time
 from pathlib import Path
 from typing import Any,Optional
 try:
-    import networkx as nx 
+    import networkx as nx
 except ImportError:
-    nx=None 
+    nx=None
 from config.settings import ANDROGUARD_CACHE_DIR,ANDROGUARD_CACHE_ENABLED
 logger=logging.getLogger(__name__)
 class DEXDisassemblyError(Exception):
@@ -54,7 +54,6 @@ class DEXDisassembler:
     >>> analysis, cfg = stage.run("/path/to/sample.apk")
     """
     STAGE_NAME="STAGE_B"
-    
     DEX_CLASS_LOADER_SIG="dalvik/system/DexClassLoader;-><init>("
     def __init__(self)->None:
         if ANDROGUARD_CACHE_ENABLED:
@@ -63,9 +62,6 @@ class DEXDisassembler:
                 os.chmod(ANDROGUARD_CACHE_DIR,0o700)
             except OSError:
                 pass
-    
-    
-    
     def run(self,apk_path:str)->tuple[Any,Any]:
         """
         Execute Stage B.
@@ -86,18 +82,14 @@ class DEXDisassembler:
         """
         t0=time.perf_counter()
         logger.info("[Stage B] Starting DEX disassembly: %s",apk_path)
-        
         analysis,apk_obj,dex_list=self._run_androguard(apk_path)
-        
         cfg=self._build_cfg(analysis)
-        
         dynamic_loading=self._detect_dynamic_loading(analysis)
         if dynamic_loading:
             logger.warning(
                 "[Stage B] DexClassLoader detected â€” APK uses dynamic DEX loading. "
                 "Consider Frida hook for complete analysis."
             )
-        
         elapsed_ms=(time.perf_counter()-t0)*1000
         method_count=sum(1 for _ in analysis.get_methods())
         class_count=sum(1 for _ in analysis.get_classes())
@@ -106,16 +98,13 @@ class DEXDisassembler:
             elapsed_ms,class_count,method_count,
         )
         return analysis,cfg
-    
-    
-    
     def _run_androguard(self,apk_path:str)->tuple[Any,Any,list]:
         """
         Call Androguard's AnalyzeAPK on the given APK.
         Returns (Analysis, APK, list_of_DalvikVMFormat).
         """
         try:
-            from androguard.misc import AnalyzeAPK 
+            from androguard.misc import AnalyzeAPK
         except ImportError as exc:
             raise DEXDisassemblyError(
                 "Androguard is not installed. Run: pip install androguard==3.4.0"
@@ -124,14 +113,11 @@ class DEXDisassembler:
             apk_obj,dex_list,analysis=AnalyzeAPK(apk_path)
         except Exception as exc:
             raise DEXDisassemblyError(
-                f"Androguard AnalyzeAPK failed for {apk_path}: {exc}"
+                f"Androguard AnalyzeAPK failed for{apk_path}:{exc}"
             )from exc
         if analysis is None:
             raise DEXDisassemblyError("Androguard returned None analysis â€” empty or invalid DEX")
         return analysis,apk_obj,dex_list
-    
-    
-    
     def _build_cfg(self,analysis:Any)->Optional[Any]:
         """
         Construct a directed NetworkX graph where:
@@ -151,7 +137,6 @@ class DEXDisassembler:
                 continue
             caller_desc=self._method_descriptor(method_analysis)
             cfg.add_node(caller_desc)
-            
             for _,callee_method,_ in method_analysis.get_xref_to():
                 if callee_method is None:
                     continue
@@ -162,9 +147,6 @@ class DEXDisassembler:
             cfg.number_of_nodes(),cfg.number_of_edges()
         )
         return cfg
-    
-    
-    
     def _detect_dynamic_loading(self,analysis:Any)->bool:
         """
         Check if any reachable method invokes DexClassLoader.<init>().
@@ -182,9 +164,6 @@ class DEXDisassembler:
                 if self.DEX_CLASS_LOADER_SIG in descriptor:
                     return True
         return False
-    
-    
-    
     def _cache_path(self,apk_path:str)->Path:
         """Deterministic cache file path based on full APK SHA-256."""
         sha256=_full_sha256(apk_path)
@@ -194,7 +173,7 @@ class DEXDisassembler:
         return None
     def _save_to_cache(self,apk_path:str,analysis:Any,cfg:Any)->None:
         """Unsafe pickle cache persistence is intentionally disabled."""
-        return None    @staticmethod
+        return None@staticmethod
     def _method_descriptor(method_analysis:Any)->str:
         """Build a canonical Smali-style method descriptor string."""
         m=method_analysis.method
@@ -217,5 +196,3 @@ def _full_sha256(path:str)->str:
         for chunk in iter(lambda:fh.read(1024*1024),b""):
             h.update(chunk)
     return h.hexdigest()
-
-

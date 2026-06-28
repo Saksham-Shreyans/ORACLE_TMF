@@ -1,20 +1,3 @@
-"""
-ORACLE-TMF  ·  pipeline/stage_c_manifest_parser.py
-====================================================
-STAGE C — AndroidManifest.xml Deep Parsing
-Responsibility:
-  • Decompress the binary AXML-encoded AndroidManifest.xml using Androguard
-  • Extract: declared permissions, activities, services, receivers, providers
-  • Extract: intent filters, exported components, min/target SDK
-  • Detect GenAI API keys or identifiers in meta-data elements (TMF-Psi)
-  • Return a structured dict that is stored in MAG.manifest
-Inputs:  apk_path (str)
-Outputs: manifest dict (stored in MAG.manifest)
-Algorithm:
-  Androguard's APK object uses its internal AXMLPrinter to decompress
-  the binary AndroidManifest.xml (AXML format) and exposes high-level
-  getter methods.  We call these methods rather than parsing raw XML.
-"""
 from __future__ import annotations
 import logging
 import re
@@ -22,17 +5,9 @@ import time
 from typing import Any
 logger=logging.getLogger(__name__)
 class ManifestParseError(Exception):
-    """Raised when Stage C cannot parse the AndroidManifest.xml."""
+    pass
 class ManifestParser:
-    """
-    Stage C: AndroidManifest.xml Deep Parsing.
-    Usage
-    -----
-    >>> stage = ManifestParser()
-    >>> manifest = stage.run("/path/to/sample.apk")
-    """
     STAGE_NAME="STAGE_C"
-    
     GENAI_META_KEY_PATTERNS:tuple[str,...]=(
         r"(?i)gemini",
         r"(?i)openai",
@@ -47,37 +22,7 @@ class ManifestParser:
         self._genai_patterns=[
             re.compile(p)for p in self.GENAI_META_KEY_PATTERNS
         ]
-    
-    
-    
     def run(self,apk_path:str)->dict:
-        """
-        Execute Stage C.
-        Parameters
-        ----------
-        apk_path : str
-            Absolute path to the .apk file.
-        Returns
-        -------
-        manifest : dict
-            Structured manifest data.  Schema:
-            {
-              "package_name":  str,
-              "permissions":   [str, ...],
-              "activities":    [{"name": str, "exported": bool, "intent_filters": [...]}],
-              "services":      [{"name": str, "exported": bool}],
-              "receivers":     [{"name": str, "exported": bool}],
-              "providers":     [{"name": str, "exported": bool}],
-              "meta_data":     {key: value},
-              "min_sdk":       int,
-              "target_sdk":    int,
-              "genai_hints":   [str],   # TMF-Psi: any GenAI meta-data detected
-            }
-        Raises
-        ------
-        ManifestParseError
-            If Androguard fails to parse the manifest.
-        """
         t0=time.perf_counter()
         logger.info("[Stage C] Parsing AndroidManifest.xml from: %s",apk_path)
         apk_obj=self._load_apk(apk_path)
@@ -93,13 +38,9 @@ class ManifestParser:
             len(manifest["receivers"]),
         )
         return manifest
-    
-    
-    
     def _load_apk(self,apk_path:str)->Any:
-        """Load the APK with Androguard's APK class."""
         try:
-            from androguard.core.bytecodes.apk import APK 
+            from androguard.core.bytecodes.apk import APK
             return APK(apk_path)
         except ImportError as exc:
             raise ManifestParseError(
@@ -107,13 +48,9 @@ class ManifestParser:
             )from exc
         except Exception as exc:
             raise ManifestParseError(
-                f"Failed to load APK for manifest parsing: {exc}"
+                f"Failed to load APK for manifest parsing:{exc}"
             )from exc
-    
-    
-    
     def _extract_manifest(self,apk:Any)->dict:
-        """Extract all manifest fields from the Androguard APK object."""
         manifest:dict={
             "package_name":self._safe(apk.get_package),
             "permissions":self._extract_permissions(apk),
@@ -131,7 +68,6 @@ class ManifestParser:
         manifest["genai_hints"]=self._detect_genai_hints(manifest)
         return manifest
     def _extract_permissions(self,apk:Any)->list[str]:
-        """Extract all <uses-permission> entries."""
         try:
             perms=apk.get_permissions()
             return sorted(set(str(p)for p in perms))if perms else[]
@@ -139,7 +75,6 @@ class ManifestParser:
             logger.debug("[Stage C] Permission extraction failed: %s",exc)
             return[]
     def _extract_activities(self,apk:Any)->list[dict]:
-        """Extract <activity> components with intent filters."""
         activities=[]
         try:
             for name in apk.get_activities():
@@ -154,7 +89,6 @@ class ManifestParser:
             logger.debug("[Stage C] Activity extraction failed: %s",exc)
         return activities
     def _extract_services(self,apk:Any)->list[dict]:
-        """Extract <service> components."""
         services=[]
         try:
             for name in apk.get_services():
@@ -166,7 +100,6 @@ class ManifestParser:
             logger.debug("[Stage C] Service extraction failed: %s",exc)
         return services
     def _extract_receivers(self,apk:Any)->list[dict]:
-        """Extract <receiver> components."""
         receivers=[]
         try:
             for name in apk.get_receivers():
@@ -178,7 +111,6 @@ class ManifestParser:
             logger.debug("[Stage C] Receiver extraction failed: %s",exc)
         return receivers
     def _extract_providers(self,apk:Any)->list[dict]:
-        """Extract <provider> components."""
         providers=[]
         try:
             for name in apk.get_providers():
@@ -190,14 +122,8 @@ class ManifestParser:
             logger.debug("[Stage C] Provider extraction failed: %s",exc)
         return providers
     def _extract_meta_data(self,apk:Any)->dict:
-        """
-        Extract <meta-data> key-value pairs from the application element.
-        These often contain API keys, configuration flags, or library tokens.
-        """
         meta:dict={}
         try:
-            
-            
             xml_str=apk.get_android_manifest_axml().get_xml()
             if xml_str:
                 xml_text=xml_str.decode("utf-8",errors="replace")if isinstance(xml_str,bytes)else xml_str
@@ -211,10 +137,6 @@ class ManifestParser:
             logger.debug("[Stage C] Meta-data extraction failed: %s",exc)
         return meta
     def _detect_genai_hints(self,manifest:dict)->list[str]:
-        """
-        TMF-Psi: Scan meta-data keys/values and permission strings for
-        references to GenAI APIs.  Returns a list of hint strings.
-        """
         hints:list[str]=[]
         meta=manifest.get("meta_data",{})
         for key,value in meta.items():
@@ -224,18 +146,9 @@ class ManifestParser:
                     hints.append(combined)
                     break
         return hints
-    
-    
-    
     @staticmethod
     def _is_exported(apk:Any,component_name:str,comp_type:str)->bool:
-        """
-        Determine if a component is exported.
-        An exported component is accessible from other apps and is an
-        attack surface for inter-component communication (ICC) exploits.
-        """
         try:
-            
             manifest_xml=apk.get_android_manifest_axml().get_xml()
             if not manifest_xml:
                 return False
@@ -251,14 +164,12 @@ class ManifestParser:
             return False
     @staticmethod
     def _get_intent_filters(apk:Any,component_name:str,comp_type:str)->list[dict]:
-        """Extract intent filter action/category lists for a given component."""
         filters:list[dict]=[]
         try:
             xml_bytes=apk.get_android_manifest_axml().get_xml()
             if not xml_bytes:
                 return filters
             xml_text=xml_bytes.decode("utf-8",errors="replace")if isinstance(xml_bytes,bytes)else xml_bytes
-            
             short_name=component_name.split(".")[-1]
             block_re=re.compile(
                 rf'<{comp_type}[^>]*(?:{re.escape(component_name)}|{re.escape(short_name)})'
@@ -280,7 +191,6 @@ class ManifestParser:
         return filters
     @staticmethod
     def _safe(getter)->str:
-        """Call a getter, return empty string on any exception."""
         try:
             result=getter()
             return str(result)if result is not None else ""
@@ -288,7 +198,6 @@ class ManifestParser:
             return ""
     @staticmethod
     def _safe_int(getter)->int:
-        """Call a getter that should return an int."""
         try:
             result=getter()
             return int(result)if result is not None else 0

@@ -3,6 +3,7 @@ ORACLE-TMF  Â·  engines/dte_engine.py
 ======================================
 DORMANCY TAXONOMY ENGINE (DTE)
 The DTE is a 4-class XGBoost classifier that resolves a critical ambiguity:
+    pass
 Not all statically unreachable code is a mutation artifact. A huge fraction
 of dead code in real-world APKs is benign SDK boilerplate left behind by
 third-party library inclusion (Firebase, Google Play Services, etc.).
@@ -53,7 +54,6 @@ from config.settings import(
 )
 from models.mutation_artifact_graph import DeadCodeArtifact,DTEClass
 logger=logging.getLogger(__name__)
-
 _LABEL_TO_INT:dict[str,int]={
     DTE_CLASS_REMNANT:0,
     DTE_CLASS_SCAFFOLDING:1,
@@ -61,7 +61,6 @@ _LABEL_TO_INT:dict[str,int]={
     DTE_CLASS_ENC_DROPPER:3,
 }
 _INT_TO_LABEL:dict[int,str]={v:k for k,v in _LABEL_TO_INT.items()}
-
 _INT_TO_DTECLASS:dict[int,DTEClass]={
     0:DTEClass.REMNANT,
     1:DTEClass.SCAFFOLDING,
@@ -85,9 +84,6 @@ class DTEEngine:
         except OSError:
             pass
         self._model=self._train_model()
-    
-    
-    
     def classify(
         self,artifacts:list[DeadCodeArtifact]
     )->list[DeadCodeArtifact]:
@@ -109,9 +105,7 @@ class DTEEngine:
             return[]
         t0=time.perf_counter()
         logger.info("[DTE] Classifying %d dead code artifact(s)",len(artifacts))
-        
         X=self._build_feature_matrix(artifacts)
-        
         try:
             y_pred=self._model.predict(X)
             y_proba=self._model.predict_proba(X)
@@ -121,7 +115,6 @@ class DTEEngine:
                 a.dte_label=DTEClass.SCAFFOLDING
                 a.dte_confidence=0.5
             return artifacts
-        
         non_remnant:list[DeadCodeArtifact]=[]
         class_counts:dict[str,int]={k:0 for k in _LABEL_TO_INT}
         for artifact,pred_int,proba_row in zip(artifacts,y_pred,y_proba):
@@ -136,7 +129,6 @@ class DTEEngine:
             if dte_class!=DTEClass.REMNANT:
                 non_remnant.append(artifact)
         elapsed_ms=(time.perf_counter()-t0)*1000
-        
         remnant_count=sum(1 for a in artifacts if a.dte_label==DTEClass.REMNANT)
         scaffold_count=sum(1 for a in artifacts if a.dte_label==DTEClass.SCAFFOLDING)
         logic_bomb_count=sum(1 for a in artifacts if a.dte_label==DTEClass.LOGIC_BOMB)
@@ -147,9 +139,6 @@ class DTEEngine:
             elapsed_ms,remnant_count,scaffold_count,logic_bomb_count,dropper_count,
         )
         return non_remnant
-    
-    
-    
     @staticmethod
     def _build_feature_matrix(artifacts:list[DeadCodeArtifact])->np.ndarray:
         """
@@ -171,9 +160,6 @@ class DTEEngine:
         if not rows:
             return np.empty((0,4),dtype=np.float32)
         return np.array(rows,dtype=np.float32)
-    
-    
-    
     def _train_model(self)->object:
         """
         Train the DTE XGBoost classifier on a synthetic dataset.
@@ -188,7 +174,7 @@ class DTEEngine:
         Total: ~8700 samples, stratified.
         """
         try:
-            from xgboost import XGBClassifier 
+            from xgboost import XGBClassifier
         except ImportError as exc:
             raise ImportError(
                 "xgboost not installed. Run inside the project virtualenv: python -m pip install xgboost"
@@ -211,13 +197,13 @@ class DTEEngine:
         model.fit(X,y)
         elapsed_ms=(time.perf_counter()-t0)*1000
         logger.info("[DTE] Model trained in %.1f ms",elapsed_ms)
-        
         return model
     @staticmethod
     def _generate_synthetic_data(rng:np.random.Generator)->tuple[np.ndarray,np.ndarray]:
         """
         Generate synthetic training data for the DTE classifier.
         Feature distributions are derived from domain knowledge:
+            pass
         REMNANT (0) â€” SDK boilerplate:
           â€¢ trigger_depth:   0-1  (no complex guards)
           â€¢ guard_entropy:   0.0-1.5 (low complexity)
@@ -241,7 +227,6 @@ class DTEEngine:
         """
         samples_per_class={0:5000,1:3000,2:500,3:200}
         X_parts,y_parts=[],[]
-        
         n=samples_per_class[0]
         X_parts.append(np.column_stack([
             rng.integers(0,2,size=n).astype(float),
@@ -250,7 +235,6 @@ class DTEEngine:
             rng.integers(2,16,size=n).astype(float),
         ]))
         y_parts.append(np.zeros(n,dtype=int))
-        
         n=samples_per_class[1]
         X_parts.append(np.column_stack([
             rng.integers(0,3,size=n).astype(float),
@@ -259,7 +243,6 @@ class DTEEngine:
             rng.integers(0,3,size=n).astype(float),
         ]))
         y_parts.append(np.ones(n,dtype=int))
-        
         n=samples_per_class[2]
         X_parts.append(np.column_stack([
             rng.integers(3,9,size=n).astype(float),
@@ -268,7 +251,6 @@ class DTEEngine:
             rng.integers(0,2,size=n).astype(float),
         ]))
         y_parts.append(np.full(n,2,dtype=int))
-        
         n=samples_per_class[3]
         X_parts.append(np.column_stack([
             rng.integers(1,5,size=n).astype(float),
@@ -279,8 +261,5 @@ class DTEEngine:
         y_parts.append(np.full(n,3,dtype=int))
         X=np.vstack(X_parts).astype(np.float32)
         y=np.concatenate(y_parts).astype(np.int32)
-        
         idx=rng.permutation(len(X))
         return X[idx],y[idx]
-
-

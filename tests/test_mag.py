@@ -1,22 +1,7 @@
-"""
-ORACLE-TMF  ·  tests/test_mag.py
-==================================
-Unit tests for the MutationArtifactGraph (MAG) data schema.
-Tests cover:
-  • Dataclass instantiation for all 7 artifact types
-  • MAG serialisation (to_dict, to_json, to_llm_context)
-  • MAG deserialisation (from_dict round-trip)
-  • Computed properties (total_artifact_count, artifact_class_counts)
-  • Bayesian density computation
-  • LLM context truncation safety
-These tests have ZERO external dependencies beyond the standard library.
-They validate that the shared data schema behaves correctly in isolation.
-"""
 import json
 import sys
 import unittest
 from pathlib import Path
-
 sys.path.insert(0,str(Path(__file__).parent.parent))
 from models.mutation_artifact_graph import(
     APKMetadata,
@@ -34,7 +19,6 @@ from models.mutation_artifact_graph import(
     VersionDelta,
 )
 class TestAPKMetadata(unittest.TestCase):
-    """Test APKMetadata dataclass."""
     def test_default_instantiation(self):
         m=APKMetadata()
         self.assertEqual(m.sha256,"")
@@ -54,7 +38,6 @@ class TestAPKMetadata(unittest.TestCase):
         self.assertTrue(m.is_packed)
         self.assertEqual(len(m.entry_points),1)
 class TestDeadCodeArtifact(unittest.TestCase):
-    """Test Class 1 artifact dataclass."""
     def test_default_label(self):
         a=DeadCodeArtifact(
             class_name="Lcom/evil/Payload;",
@@ -78,7 +61,6 @@ class TestDeadCodeArtifact(unittest.TestCase):
         a.dte_label=DTEClass.LOGIC_BOMB
         self.assertEqual(a.dte_label,DTEClass.LOGIC_BOMB)
 class TestArtifactVariety(unittest.TestCase):
-    """Smoke-test instantiation of all 7 artifact classes."""
     def test_unused_permission(self):
         a=UnusedPermissionArtifact(
             permission_name="android.permission.SEND_SMS",
@@ -128,7 +110,6 @@ class TestArtifactVariety(unittest.TestCase):
         )
         self.assertEqual(a.provider,"Gemini")
 class TestMutationArtifactGraph(unittest.TestCase):
-    """Test the root MAG schema."""
     def _make_populated_mag(self)->MutationArtifactGraph:
         mag=MutationArtifactGraph()
         mag.apk_metadata=APKMetadata(sha256="deadbeef",package_name="com.evil.trojan")
@@ -159,7 +140,6 @@ class TestMutationArtifactGraph(unittest.TestCase):
         return mag
     def test_total_artifact_count(self):
         mag=self._make_populated_mag()
-        
         self.assertEqual(mag.total_artifact_count(),4)
     def test_artifact_class_counts(self):
         mag=self._make_populated_mag()
@@ -176,7 +156,6 @@ class TestMutationArtifactGraph(unittest.TestCase):
         self.assertEqual(passed[0].predicted_technique,"T1568.002")
     def test_high_confidence_filter(self):
         mag=self._make_populated_mag()
-        
         passed=mag.high_confidence_forecasts(threshold=0.90)
         self.assertEqual(len(passed),0)
     def test_scaffolding_artifacts(self):
@@ -186,7 +165,6 @@ class TestMutationArtifactGraph(unittest.TestCase):
         self.assertEqual(scaffolding[0].dte_label,DTEClass.SCAFFOLDING)
     def test_compute_artifact_density_three_classes(self):
         mag=self._make_populated_mag()
-        
         density=mag.compute_artifact_density()
         self.assertEqual(density,1.00)
     def test_compute_artifact_density_one_class(self):
@@ -198,7 +176,6 @@ class TestMutationArtifactGraph(unittest.TestCase):
         mag=MutationArtifactGraph()
         self.assertEqual(mag.compute_artifact_density(),0.0)
 class TestMAGSerialisation(unittest.TestCase):
-    """Test MAG serialisation and round-trip fidelity."""
     def _make_mag(self)->MutationArtifactGraph:
         mag=MutationArtifactGraph()
         mag.apk_metadata=APKMetadata(sha256="cafebabe",package_name="com.test.app")
@@ -226,7 +203,6 @@ class TestMAGSerialisation(unittest.TestCase):
         self.assertEqual(len(data["mutation_artifacts"]["dead_code"]),1)
     def test_to_llm_context_respects_limit(self):
         mag=self._make_mag()
-        
         mag.dead_code[0].smali_code="x"*100_000
         ctx=mag.to_llm_context(max_chars=5000)
         self.assertLessEqual(len(ctx),5200)
@@ -239,15 +215,13 @@ class TestMAGSerialisation(unittest.TestCase):
         self.assertEqual(len(mag_rt.dead_code),1)
         self.assertEqual(mag_rt.dead_code[0].class_name,"Lcom/A;")
     def test_to_dict_no_external_deps(self):
-        """Serialisation must work with zero external libraries."""
         mag=MutationArtifactGraph()
         try:
             mag.to_dict()
             mag.to_json()
         except ImportError as exc:
-            self.fail(f"to_dict/to_json raised ImportError: {exc}")
+            self.fail(f"to_dict/to_json raised ImportError:{exc}")
 class TestVersionDelta(unittest.TestCase):
-    """Test VersionDelta dataclass."""
     def test_default_mvv(self):
         delta=VersionDelta()
         self.assertEqual(delta.mvv_normalized,1.0)
@@ -263,7 +237,6 @@ class TestVersionDelta(unittest.TestCase):
         )
         self.assertEqual(len(delta.artifacts_added),1)
 class TestMutationForecast(unittest.TestCase):
-    """Test MutationForecast dataclass."""
     def test_gate_default_false(self):
         f=MutationForecast()
         self.assertFalse(f.passes_gate)

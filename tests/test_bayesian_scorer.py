@@ -1,17 +1,3 @@
-"""
-ORACLE-TMF  ·  tests/test_bayesian_scorer.py
-===============================================
-Unit tests for Stage K — Bayesian Confidence Scoring.
-Tests validate:
-  • Exact formula: C = 0.45×P_LLM + 0.35×D×MVV + 0.20×H_prior
-  • Weight sum assertion (weights must total 1.0)
-  • Gating threshold (C > 0.72)
-  • Artifact density computation (0.33 / 0.66 / 1.00 steps)
-  • MVV clipping to [0.5, 1.5]
-  • Probability sanitisation ([0.0, 1.0] clamping)
-  • Edge cases: zero inputs, maximum inputs
-No external libraries required — all tested in pure Python.
-"""
 import sys
 import unittest
 from pathlib import Path
@@ -36,11 +22,10 @@ from models.mutation_artifact_graph import(
 )
 from pipeline.stage_k_bayesian_scorer import BayesianScorer
 class TestBayesianWeights(unittest.TestCase):
-    """Validate the weight constants defined in settings."""
     def test_weights_sum_to_one(self):
         total=BAYESIAN_WEIGHT_P_LLM+BAYESIAN_WEIGHT_D_ARTIFACT+BAYESIAN_WEIGHT_H_PRIOR
         self.assertAlmostEqual(total,1.0,places=9,
-                               msg=f"Bayesian weights sum to {total}, expected 1.0")
+                               msg=f"Bayesian weights sum to{total},expected 1.0")
     def test_individual_weights(self):
         self.assertAlmostEqual(BAYESIAN_WEIGHT_P_LLM,0.45,places=9)
         self.assertAlmostEqual(BAYESIAN_WEIGHT_D_ARTIFACT,0.35,places=9)
@@ -55,7 +40,6 @@ class TestBayesianWeights(unittest.TestCase):
         self.assertAlmostEqual(ARTIFACT_DENSITY_SCORES[2],0.66,places=9)
         self.assertAlmostEqual(ARTIFACT_DENSITY_SCORES[3],1.00,places=9)
 class TestBayesianFormula(unittest.TestCase):
-    """Validate the exact Bayesian formula implementation."""
     def setUp(self):
         self.scorer=BayesianScorer()
     def _make_mag_with_three_classes(self)->MutationArtifactGraph:
@@ -67,30 +51,17 @@ class TestBayesianFormula(unittest.TestCase):
         mag.version_delta=VersionDelta(mvv_normalized=1.0)
         return mag
     def test_formula_high_confidence(self):
-        """
-        Manually compute expected C for known inputs and verify scorer matches.
-        Given:
-          p_llm  = 0.90  → w1 = 0.45 × 0.90 = 0.405
-          D      = 1.00 (3 artifact classes active)
-          MVV    = 1.00  → w2 = 0.35 × 1.00 × 1.00 = 0.350
-          H_prior= 0.50  → w3 = 0.20 × 0.50 = 0.100
-          C_expected = 0.405 + 0.350 + 0.100 = 0.855
-        """
         mag=self._make_mag_with_three_classes()
         forecast=MutationForecast(p_llm=0.90,supporting_artifacts=["CLASS_1_DEAD_CODE"])
         forecasts_in=[forecast]
-        
         original_get_prior=self.scorer._get_historical_prior
         self.scorer._get_historical_prior=lambda technique,family:0.50
         scored=self.scorer.run(forecasts_in,mag,rag=None)
         self.scorer._get_historical_prior=original_get_prior
         self.assertEqual(len(scored),1)
         result=scored[0]
-        
         self.assertAlmostEqual(result.artifact_density,1.00,places=2)
-        
         self.assertAlmostEqual(result.mvv_normalized,1.00,places=2)
-        
         expected_c=0.45*0.90+0.35*1.00*1.00+0.20*0.50
         self.assertAlmostEqual(result.confidence_score,expected_c,places=2)
     def test_gate_passes_above_threshold(self):
@@ -99,14 +70,14 @@ class TestBayesianFormula(unittest.TestCase):
         self.scorer._get_historical_prior=lambda technique,family:0.80
         scored=self.scorer.run([forecast],mag,rag=None)
         self.assertTrue(scored[0].passes_gate,
-                        f"Expected gate=True, C={scored[0].confidence_score:.3f}")
+                        f"Expected gate=True,C={scored[0].confidence_score:.3f}")
     def test_gate_fails_below_threshold(self):
         mag=MutationArtifactGraph()
         forecast=MutationForecast(p_llm=0.20)
         self.scorer._get_historical_prior=lambda technique,family:0.05
         scored=self.scorer.run([forecast],mag,rag=None)
         self.assertFalse(scored[0].passes_gate,
-                         f"Expected gate=False, C={scored[0].confidence_score:.3f}")
+                         f"Expected gate=False,C={scored[0].confidence_score:.3f}")
     def test_empty_forecast_list_returns_empty(self):
         mag=MutationArtifactGraph()
         scored=self.scorer.run([],mag,rag=None)
@@ -123,9 +94,7 @@ class TestBayesianFormula(unittest.TestCase):
         self.assertEqual(scores,sorted(scores,reverse=True),
                          "Forecasts must be sorted by confidence descending")
     def test_probability_sanitisation(self):
-        """Confidence score must always be in [0.0, 1.0]."""
         mag=self._make_mag_with_three_classes()
-        
         forecast=MutationForecast(p_llm=1.0)
         self.scorer._get_historical_prior=lambda technique,family:1.0
         scored=self.scorer.run([forecast],mag,rag=None)
@@ -133,7 +102,6 @@ class TestBayesianFormula(unittest.TestCase):
         self.assertGreaterEqual(c,0.0)
         self.assertLessEqual(c,1.0)
 class TestArtifactDensity(unittest.TestCase):
-    """Test _compute_artifact_density static method."""
     def setUp(self):
         self.scorer=BayesianScorer()
     def test_zero_artifacts(self):
@@ -159,7 +127,6 @@ class TestArtifactDensity(unittest.TestCase):
         d=self.scorer._compute_artifact_density(mag)
         self.assertAlmostEqual(d,1.00,places=2)
     def test_seven_classes_capped_at_one(self):
-        """Density must not exceed 1.0 regardless of artifact count."""
         mag=MutationArtifactGraph()
         mag.dead_code=[DeadCodeArtifact("Lcom/A;","m()V","",5)]
         mag.unused_permissions=[UnusedPermissionArtifact("android.permission.SEND_SMS")]
@@ -169,7 +136,6 @@ class TestArtifactDensity(unittest.TestCase):
         d=self.scorer._compute_artifact_density(mag)
         self.assertLessEqual(d,1.0)
 class TestMVVNorm(unittest.TestCase):
-    """Test _get_mvv_norm static method."""
     def test_none_delta_returns_one(self):
         mvv=BayesianScorer._get_mvv_norm(None)
         self.assertEqual(mvv,1.0)
@@ -185,7 +151,6 @@ class TestMVVNorm(unittest.TestCase):
         delta=VersionDelta(mvv_normalized=1.2)
         mvv=BayesianScorer._get_mvv_norm(delta)
         self.assertAlmostEqual(mvv,1.2,places=5)
-
 from models.mutation_artifact_graph import PartialAPIArtifact
 if __name__=="__main__":
     unittest.main(verbosity=2)

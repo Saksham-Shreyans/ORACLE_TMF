@@ -51,31 +51,23 @@ from pathlib import Path
 from typing import Any,Optional
 from config.settings import XML_MAX_BYTES
 from models.mutation_artifact_graph import UnfinishedUIFlowArtifact
-from security import safe_xml_fromstring, safe_xml_parse
+from security import safe_xml_fromstring,safe_xml_parse
 logger=logging.getLogger(__name__)
-
-
-
-
 _SET_CONTENT_VIEW_RE=re.compile(
     r"invoke-virtual\s+\{[^}]+\},\s*L\w+/Activity[^;]*;->setContentView\s*\(I\)V",
     re.MULTILINE,
 )
-
 _INFLATE_RE=re.compile(
     r"invoke-virtual\s+\{[^}]+\},\s*Landroid/view/LayoutInflater;->inflate\s*\(I",
     re.MULTILINE,
 )
-
 _CONST_INT_RE=re.compile(
     r"const(?:/high16|/4|/16|/range)?\s+[vp]\d+,\s*(0x[0-9A-Fa-f]+|\d+)"
 )
-
 _LAYOUT_ID_PREFIX=0x7F040000
 _LAYOUT_ID_MASK=0xFF000000
 _LAYOUT_TYPE_MASK=0x00FF0000
 _LAYOUT_TYPE_LAYOUT=0x00040000
-
 _FINANCIAL_KEYWORDS:frozenset[str]=frozenset({
     "username","password","pin","upi","otp","cvv",
     "account","card","atm","debit","credit","bank",
@@ -83,7 +75,6 @@ _FINANCIAL_KEYWORDS:frozenset[str]=frozenset({
     "transaction","transfer","beneficiary","ifsc","swift",
     "wallet","balance","statement","passbook",
 })
-
 _WEBVIEW_TAGS:frozenset[str]=frozenset({"WebView","webview","android.webkit.WebView"})
 class UnfinishedUIDetector:
     """
@@ -97,9 +88,6 @@ class UnfinishedUIDetector:
     >>> orphaned = detector.run(apk_path, extract_dir, analysis)
     """
     STAGE_NAME="UI_DETECT"
-    
-    
-    
     def run(
         self,
         apk_path:str,
@@ -120,18 +108,14 @@ class UnfinishedUIDetector:
         t0=time.perf_counter()
         logger.info("[Class 6] Starting unfinished UI flow detection")
         artifacts:list[UnfinishedUIFlowArtifact]=[]
-        
         layout_files=self._enumerate_layout_files(extract_dir,apk_path)
         if not layout_files:
             logger.debug("[Class 6] No layout files found â€” skipping")
             return artifacts
         logger.debug("[Class 6] Layout files found: %d",len(layout_files))
-        
         inflated_ids,inflated_names=self._build_inflation_reference_set(analysis)
         logger.debug("[Class 6] Inflated resource IDs: %d",len(inflated_ids))
-        
         id_to_name=self._build_resource_id_map(extract_dir,apk_path)
-        
         for layout_path,layout_name in layout_files:
             is_referenced=self._is_layout_referenced(
                 layout_name,inflated_ids,inflated_names,id_to_name
@@ -146,9 +130,6 @@ class UnfinishedUIDetector:
             elapsed_ms,len(layout_files),len(artifacts),
         )
         return artifacts
-    
-    
-    
     def _enumerate_layout_files(
         self,extract_dir:str,apk_path:str
     )->list[tuple[str,str]]:
@@ -170,10 +151,9 @@ class UnfinishedUIDetector:
                                     fpath=os.path.join(layout_dir,fname)
                                     stem=Path(fname).stem
                                     results.append((fpath,stem))
-        
         if not results:
             try:
-                from androguard.core.bytecodes.apk import APK 
+                from androguard.core.bytecodes.apk import APK
                 apk=APK(apk_path)
                 for fpath in apk.get_files():
                     if re.match(r"res/layout[^/]*/[^/]+\.xml$",fpath):
@@ -182,9 +162,6 @@ class UnfinishedUIDetector:
             except Exception as exc:
                 logger.debug("[Class 6] APK file listing fallback failed: %s",exc)
         return results
-    
-    
-    
     def _build_inflation_reference_set(
         self,analysis:Optional[Any]
     )->tuple[set[int],set[str]]:
@@ -206,7 +183,6 @@ class UnfinishedUIDetector:
                 smali=self._get_smali(method_analysis)
                 if not smali:
                     continue
-                
                 has_inflation=(
                     _SET_CONTENT_VIEW_RE.search(smali)is not None
                     or _INFLATE_RE.search(smali)is not None
@@ -215,28 +191,21 @@ class UnfinishedUIDetector:
                 )
                 if not has_inflation:
                     continue
-                
                 for match in _CONST_INT_RE.finditer(smali):
                     raw=match.group(1)
                     try:
                         value=int(raw,16)if raw.startswith("0x")else int(raw)
-                        
                         if(value&_LAYOUT_ID_MASK)==0x7F000000:
                             inflated_ids.add(value)
                     except ValueError:
                         continue
-            
             for string_analysis in analysis.get_strings():
                 value=str(string_analysis.get_value()).strip()
-                
                 if re.match(r"^[a-z][a-z0-9_]+$",value)and 5<=len(value)<=60:
                     inflated_names.add(value)
         except Exception as exc:
             logger.warning("[Class 6] Inflation reference set build error: %s",exc)
         return inflated_ids,inflated_names
-    
-    
-    
     def _build_resource_id_map(
         self,extract_dir:str,apk_path:str
     )->dict[int,str]:
@@ -247,7 +216,6 @@ class UnfinishedUIDetector:
           2. Androguard's ARSCParser for the binary resources.arsc
         """
         id_to_name:dict[int,str]={}
-        
         public_xml=os.path.join(extract_dir,"res","values","public.xml")
         if os.path.isfile(public_xml):
             try:
@@ -268,9 +236,8 @@ class UnfinishedUIDetector:
                 return id_to_name
             except Exception as exc:
                 logger.debug("[Class 6] public.xml parse failed: %s",exc)
-        
         try:
-            from androguard.core.bytecodes.apk import APK 
+            from androguard.core.bytecodes.apk import APK
             apk=APK(apk_path)
             res=apk.get_android_resources()
             if res:
@@ -287,9 +254,6 @@ class UnfinishedUIDetector:
         except Exception as exc:
             logger.debug("[Class 6] ARSC resource map failed: %s",exc)
         return id_to_name
-    
-    
-    
     def _is_layout_referenced(
         self,
         layout_name:str,
@@ -301,21 +265,15 @@ class UnfinishedUIDetector:
         Determine if a layout is referenced anywhere in the DEX bytecode.
         Returns True if referenced (layout IS used), False if orphaned.
         """
-        
         if layout_name in inflated_names:
             return True
-        
         for res_id,name in id_to_name.items():
             if name==layout_name and res_id in inflated_ids:
                 return True
-        
         for name_str in inflated_names:
             if layout_name in name_str or name_str in layout_name:
                 return True
         return False
-    
-    
-    
     def _classify_layout(
         self,layout_path:str,layout_name:str,extract_dir:str
     )->Optional[UnfinishedUIFlowArtifact]:
@@ -323,7 +281,6 @@ class UnfinishedUIDetector:
         Parse the orphaned layout XML and classify its likely malicious purpose.
         Returns None if the layout appears benign (e.g., alternative theme XML).
         """
-        
         xml_content=""
         if os.path.isfile(layout_path):
             try:
@@ -331,9 +288,7 @@ class UnfinishedUIDetector:
             except Exception:
                 pass
         if not xml_content:
-            
             return None
-        
         root_tag=""
         layout_id=""
         asset_refs:list[str]=[]
@@ -343,7 +298,6 @@ class UnfinishedUIDetector:
                 return None
             tree=safe_xml_fromstring(xml_content)
             root_tag=tree.tag
-            
             id_re=re.compile(r'@\+id/(\w+)')
             draw_re=re.compile(r'@drawable/(\w+)|@mipmap/(\w+)')
             for elem in tree.iter():
@@ -357,29 +311,22 @@ class UnfinishedUIDetector:
                             asset_refs.append(ref)
         except Exception:
             pass
-        
         xml_lower=xml_content.lower()
-        
         if any(tag in xml_content for tag in _WEBVIEW_TAGS):
             suspected_type="webview_shell"
-        
         elif any(kw in xml_lower for kw in _FINANCIAL_KEYWORDS):
-            
             field_count=xml_lower.count("edittext")+xml_lower.count("textinputlayout")
             if field_count>=2:
                 suspected_type="credential_harvester"
             else:
                 suspected_type="phishing_overlay"
-        
         elif any(
             any(bank in ref.lower()for bank in["bank","hdfc","sbi","icici","axis","pay","upi"])
             for ref in asset_refs
         ):
             suspected_type="banking_overlay"
-        
         elif any(hint in layout_name.lower()for hint in["login","bank","pay","crypto","wallet"]):
             suspected_type="phishing_overlay"
-        
         if suspected_type=="generic_dormant"and not asset_refs and not layout_id:
             logger.debug("[Class 6] Skipping likely benign orphaned layout: %s",layout_name)
             return None
@@ -394,9 +341,6 @@ class UnfinishedUIDetector:
             suspected_type=suspected_type,
             asset_refs=asset_refs[:20],
         )
-    
-    
-    
     @staticmethod
     def _get_smali(method_analysis:Any)->str:
         """Safely extract Smali source."""
@@ -404,5 +348,3 @@ class UnfinishedUIDetector:
             return method_analysis.method.get_source()or ""
         except Exception:
             return ""
-
-
