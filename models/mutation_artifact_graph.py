@@ -1,4 +1,4 @@
-﻿"""
+"""
 ORACLE-TMF - models/mutation_artifact_graph.py
 ==============================================
 The Mutation Artifact Graph (MAG) is the canonical JSON-serialisable data
@@ -307,6 +307,9 @@ class MutationArtifactGraph:
     @classmethod
     def from_dict(cls,data:dict)->"MutationArtifactGraph":
         """Deserialise from a dict loaded from JSON cache or report output."""
+        if "mag" in data:
+            data = data["mag"]
+        
         mag=cls()
         meta=data.get("apk_metadata",{})
         mag.apk_metadata=APKMetadata(**meta)if meta else APKMetadata()

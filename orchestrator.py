@@ -218,6 +218,7 @@ class ORACLETMFOrchestrator:
             self._progress(progress_callback,"STAGE_2",0.92)
             stage2_report=None
             if stage2_config is not None:
+                self._stage2_orch = Stage2Orchestrator()
                 self._stage2_orch.config=stage2_config
                 prev_mag=self._build_static_mag(prev_apk_path)if prev_apk_path and os.path.isfile(prev_apk_path)else None
                 stage2_report=self._run_stage(
