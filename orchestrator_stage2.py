@@ -1,4 +1,4 @@
-﻿"""
+"""
 ORACLE-TMF  Â·  orchestrator_stage2.py
 =======================================
 Stage 2 Orchestrator â€” integrates all Tier 2 and Tier 3 engines
@@ -31,6 +31,7 @@ import time
 from dataclasses import dataclass,field
 from pathlib import Path
 from typing import Optional
+from config.settings import CONFIDENCE_GATE_THRESHOLD
 from models.mutation_artifact_graph import MutationArtifactGraph,MutationForecast
 from models.nav_models import NAVHistory
 from pipeline.stage2.stage_m_phantom_detonation import StageMPhantomDetonation,StageMResult
@@ -299,7 +300,7 @@ class Stage2Orchestrator:
             except Exception as exc:
                 logger.error("[Stage2Orchestrator] Network Attack analysis failed: %s",exc)
         for f in working_forecasts:
-            f.passes_gate=f.confidence_score>=getattr(f,"gate_threshold",0.6)
+            f.passes_gate=f.confidence_score>=getattr(f,"gate_threshold",CONFIDENCE_GATE_THRESHOLD)
         report.adjusted_forecasts=working_forecasts
         report.total_elapsed_ms=round((time.perf_counter()-t0)*1000,2)
         if self.config.save_json_reports:
