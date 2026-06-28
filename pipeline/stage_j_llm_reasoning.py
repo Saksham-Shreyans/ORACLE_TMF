@@ -1,4 +1,4 @@
-﻿"""
+"""
 ORACLE-TMF  Â·  pipeline/stage_j_llm_reasoning.py
 =================================================
 STAGE J â€” LLM Mutation Artifact Reasoning Engine
@@ -297,7 +297,7 @@ Output Format (JSON only):
         if self._rag is None:
             return "(RAG not available â€” no historical context)"
         try:
-            query=f"malware family{family or 'banking trojan'}MITRE ATT&CK technique mutation"
+            query=f"malware family {family or 'banking trojan'} MITRE ATT&CK technique mutation"
             docs=self._rag.retrieve(query,top_k=RAG_TOP_K)
             context_parts=[]
             total=0
@@ -416,7 +416,7 @@ class RAGRetriever:
     def ingest_mitre_technique(self,technique_id:str,name:str,description:str)->None:
         """Ingest a MITRE ATT&CK technique into the vector store."""
         from sentence_transformers import SentenceTransformer
-        text=f"{technique_id}-{name}:{description}"
+        text=f"{technique_id} - {name}: {description}"
         embedding=self._model.encode(text).tolist()
         self._mitre.add(
             ids=[technique_id],

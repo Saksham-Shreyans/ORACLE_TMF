@@ -82,7 +82,7 @@ class FridaBypassController:
             device=(
                 frida.get_device(device_id)
                 if device_id
-                else frida.get_usb_device(timeout=10)
+                else frida.get_usb_device(timeout=FRIDA_TIMEOUT_S)
             )
             bypass_session.device=device
             logger.info(

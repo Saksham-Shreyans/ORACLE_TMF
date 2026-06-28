@@ -83,7 +83,7 @@ class UnusedPermissionAnalyzer:
         api_list=", ".join(expected_apis[:2])
         return(
             f"Permission '{permission}' is declared in AndroidManifest.xml "
-            f"but none of its protected APIs({api_list}...)appear "
-            f"anywhere in the DEX bytecode.This is a strong indicator of "
+            f"but none of its protected APIs ({api_list}...) appear "
+            f"anywhere in the DEX bytecode. This is a strong indicator of "
             f"pre-declared permission scaffolding for a future feature."
         )

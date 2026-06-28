@@ -160,7 +160,8 @@ class TestNAVRedirection(unittest.TestCase):
         mag_prev=FakeMAG(dead_code_count=15,version="v1")
         mag_curr=FakeMAG(dead_code_count=0,version="v2")
         result=self.engine.run(mag_curr,mag_prev=mag_prev)
-        self.assertIsInstance(result.has_redirection,bool)
+        self.assertTrue(result.has_redirection)
+        self.assertIsNotNone(result.primary_redirection)
 class TestNAVHistoryUpdate(unittest.TestCase):
     def setUp(self):
         self.engine=NAVEngine()

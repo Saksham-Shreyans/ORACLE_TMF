@@ -196,7 +196,29 @@ class OuroborosTMF:
     )->str:
         if not refinements:
             return forecast.predicted_technique
-        return forecast.predicted_technique
+        if not ANTHROPIC_API_KEY:
+            return forecast.predicted_technique
+        try:
+            import anthropic
+            client=anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+            prompt=(
+                f"Original prediction: {forecast.predicted_technique}\n"
+                f"Refinements: {refinements}\n"
+                f"Refine the prediction based on the refinements.\n"
+                f"Respond with ONLY: {{\"technique\": \"TXXXX - Technique Name\"}}"
+            )
+            response=client.messages.create(
+                model=LLM_MODEL,
+                max_tokens=100,
+                messages=[{"role":"user","content":prompt}],
+            )
+            import json
+            text="".join(b.text for b in response.content if hasattr(b,"text"))
+            parsed=json.loads(text.strip())
+            return parsed.get("technique",forecast.predicted_technique)
+        except Exception as exc:
+            logger.debug("[OUROBOROS] Refined prediction LLM failed: %s",exc)
+            return forecast.predicted_technique
     def _infer_mature_technique(
         self,
         mag:MutationArtifactGraph,

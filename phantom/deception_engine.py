@@ -202,7 +202,7 @@ class PhantomDeceptionEngine:
             user_content=parts[1].strip()if len(parts)>1 else prompt
             msg=client.messages.create(
                 model=LLM_MODEL,
-                max_tokens=512,
+                max_tokens=LLM_MAX_TOKENS,
                 system=system_content,
                 messages=[{"role":"user","content":user_content}],
             )

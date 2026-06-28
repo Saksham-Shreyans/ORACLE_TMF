@@ -1,4 +1,4 @@
-﻿"""Focused tests for Stage L research paper draft output."""
+"""Focused tests for Stage L research paper draft output."""
 import os
 import sys
 import tempfile
@@ -17,9 +17,7 @@ class TestStageLResearchPaper(unittest.TestCase):
         mag.forecasts=[MutationForecast(predicted_technique="T1406",confidence_score=0.81,passes_gate=True)]
         mag.stage_timings_ms={"STAGE_A":1.0,"STAGE_C":1.0,"STAGE_F":1.0,"TARGETING":1.0,"STAGE_I":1.0}
         ResearchReadinessEngine().assess(mag)
-        tmp_root=Path("C:/tmp")
-        tmp_root.mkdir(parents=True,exist_ok=True)
-        with tempfile.TemporaryDirectory(dir=tmp_root)as tmp:
+        with tempfile.TemporaryDirectory() as tmp:
             original_dir=stage_l.REPORT_OUTPUT_DIR
             stage_l.REPORT_OUTPUT_DIR=tmp
             try:

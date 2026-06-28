@@ -1,4 +1,4 @@
-﻿"""
+"""
 ORACLE-TMF  Â·  pipeline/stage_b_dex_disassembly.py
 ====================================================
 STAGE B â€” DEX Bytecode Disassembly and Smali Extraction
@@ -173,7 +173,9 @@ class DEXDisassembler:
         return None
     def _save_to_cache(self,apk_path:str,analysis:Any,cfg:Any)->None:
         """Unsafe pickle cache persistence is intentionally disabled."""
-        return None@staticmethod
+        return None
+        
+    @staticmethod
     def _method_descriptor(method_analysis:Any)->str:
         """Build a canonical Smali-style method descriptor string."""
         m=method_analysis.method

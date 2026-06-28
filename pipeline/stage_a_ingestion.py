@@ -40,7 +40,7 @@ class APKIngestion:
         is_packed,packer_hint=self._detect_packer(extract_dir,apk_path)
         cert_issuer,cert_subject,cert_sha256=self._parse_certificate(extract_dir)
         package_name,version_name,version_code=self._read_apk_identity(apk_path)
-        min_sdk,target_sdk=self._read_sdk_versions(extract_dir)
+        min_sdk,target_sdk=self._read_sdk_versions(apk_path)
         entry_points=self._detect_entry_points(extract_dir)
         metadata=APKMetadata(
             apk_path=apk_path,
@@ -236,14 +236,18 @@ class APKIngestion:
         except Exception as exc:
             logger.warning("[Stage A] Identity extraction failed: %s",exc)
             return "","",0
-    def _read_sdk_versions(self,extract_dir:str)->tuple[int,int]:
+    def _read_sdk_versions(self,apk_path:str)->tuple[int,int]:
         try:
             from androguard.core.bytecodes.apk import APK
-            manifest_path=os.path.join(extract_dir,"AndroidManifest.xml")
-            if not os.path.isfile(manifest_path):
-                return 0,0
+            apk=APK(apk_path)
+            min_sdk=apk.get_min_sdk_version()
+            target_sdk=apk.get_target_sdk_version()
+            return int(min_sdk) if min_sdk else 0, int(target_sdk) if target_sdk else 0
+        except ImportError:
+            logger.debug("[Stage A] Androguard not available for sdk extraction")
             return 0,0
-        except Exception:
+        except Exception as exc:
+            logger.debug("[Stage A] SDK extraction failed: %s", exc)
             return 0,0
     def _detect_entry_points(self,extract_dir:str)->list[str]:
         entry_points:list[str]=[]

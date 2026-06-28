@@ -183,7 +183,7 @@ class HoneytokenGenerator:
         check=self._luhn_check_digit(partial)
         card_num=partial+str(check)
         expiry_month=self._rng.randint(1,12)
-        expiry_year=2026+self._rng.randint(0,4)
+        expiry_year=time.gmtime().tm_year+self._rng.randint(0,4)
         cvv="".join(str(self._rng.randint(0,9))for _ in range(3))
         return PaymentCard(
             card_number=card_num,
@@ -220,7 +220,7 @@ class HoneytokenGenerator:
                 merchant=self._rng.choice(
                     ["Amazon","BigBasket","Swiggy","Zepto","Flipkart"]
                 ),
-                date=f"{self._rng.randint(1,28):02d}/{self._rng.randint(1,12):02d}/2026",
+                date=time.strftime("%d/%m/%Y", time.gmtime()),
                 minutes=self._rng.choice([3,5,10,15]),
                 purpose=self._rng.choice(["login","transaction","fund transfer","OTP"]),
             )
@@ -244,7 +244,7 @@ class HoneytokenGenerator:
             account_last4="1234",
             card_last4="5678",
             merchant="ORACLE_TEST",
-            date="27/06/2026",
+            date=time.strftime("%d/%m/%Y", time.gmtime()),
             minutes=10,
             purpose=purpose,
             balance="50,000.00",

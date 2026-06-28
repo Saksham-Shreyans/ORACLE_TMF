@@ -1,4 +1,4 @@
-﻿"""
+"""
 ORACLE-TMF  ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â·  pipeline/stage_l_report_synthesizer.py
 =======================================================
 STAGE L ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Forecast Report Synthesizer
@@ -275,13 +275,13 @@ class ReportSynthesizer:
             f"(1 of($c2_stub_*)and 1 of($unused_perm_*))\n"
             f")\n"
         )
-        return f"rule{rule_name}\n{{\n{meta_block}{strings_block}{condition_block}}}\n\n"
+        return f"rule {rule_name}\n{{\n{meta_block}{strings_block}{condition_block}}}\n\n"
     def _yara_fingerprint_rule(self,mag:MutationArtifactGraph)->str:
         """Generic APK fingerprint rule when no forecast passes the gate."""
         family_clean=_yara_identifier(mag.malware_family or "UNKNOWN")
         rule_name=f"ORACLE_TMF_{family_clean}_APK_Fingerprint"
         return(
-            f"rule{rule_name}\n"
+            f"rule {rule_name}\n"
             f"{{\n"
             f"    meta:\n"
             f'        description="ORACLE-TMF APK fingerprint-no high-confidence forecast"\n'

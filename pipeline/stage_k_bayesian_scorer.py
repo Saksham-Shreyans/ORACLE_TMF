@@ -120,7 +120,7 @@ class BayesianScorer:
         if self._rag is None or not technique:
             return DEFAULT_PRIOR
         try:
-            query=f"{family}malware{technique}historical precedent evolution"
+            query=f"{family} malware {technique} historical precedent evolution"
             docs=self._rag.retrieve(query,top_k=3)
             if not docs:
                 return DEFAULT_PRIOR

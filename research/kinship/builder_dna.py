@@ -53,13 +53,13 @@ class BuilderDNAVector:
         )[:30]
         opcode_text=" ".join(k for k,_ in top_opcodes)
         ifaces=" ".join(self.partial_api_interfaces[:10])
-        return(
-            f"ngrams:{ngram_text}"
-            f"opcodes:{opcode_text}"
-            f"c2_framework:{self.c2_framework_fingerprint}"
-            f"entropy_mean:{self.entropy_mean:.2f}"
-            f"entropy_std:{self.entropy_std:.2f}"
-            f"api_ifaces:{ifaces}"
+        return (
+            f"ngrams: {ngram_text} "
+            f"opcodes: {opcode_text} "
+            f"c2_framework: {self.c2_framework_fingerprint} "
+            f"entropy_mean: {self.entropy_mean:.2f} "
+            f"entropy_std: {self.entropy_std:.2f} "
+            f"api_ifaces: {ifaces}"
         )
     def to_dict(self)->dict:
         return{
