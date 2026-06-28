@@ -182,8 +182,10 @@ class HoneytokenGenerator:
         )
         check=self._luhn_check_digit(partial)
         card_num=partial+str(check)
-        expiry_month=self._rng.randint(1,12)
-        expiry_year=time.gmtime().tm_year+self._rng.randint(0,4)
+        now = time.gmtime()
+        expiry_year=now.tm_year+self._rng.randint(0,4)
+        min_month = now.tm_mon if expiry_year == now.tm_year else 1
+        expiry_month=self._rng.randint(min_month,12)
         cvv="".join(str(self._rng.randint(0,9))for _ in range(3))
         return PaymentCard(
             card_number=card_num,

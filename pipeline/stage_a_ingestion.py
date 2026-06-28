@@ -244,8 +244,20 @@ class APKIngestion:
             target_sdk=apk.get_target_sdk_version()
             return int(min_sdk) if min_sdk else 0, int(target_sdk) if target_sdk else 0
         except ImportError:
-            logger.debug("[Stage A] Androguard not available for sdk extraction")
-            return 0,0
+            logger.debug("[Stage A] Androguard not available for sdk extraction, trying fallback")
+            try:
+                import subprocess
+                out = subprocess.check_output(["aapt", "dump", "badging", apk_path], stderr=subprocess.STDOUT, timeout=5).decode(errors="ignore")
+                min_sdk, target_sdk = 0, 0
+                for line in out.splitlines():
+                    if line.startswith("sdkVersion:"):
+                        min_sdk = int(line.split("'")[1])
+                    elif line.startswith("targetSdkVersion:"):
+                        target_sdk = int(line.split("'")[1])
+                return min_sdk, target_sdk
+            except Exception as e:
+                logger.debug(f"[Stage A] SDK fallback failed: {e}")
+                return 0, 0
         except Exception as exc:
             logger.debug("[Stage A] SDK extraction failed: %s", exc)
             return 0,0

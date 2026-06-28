@@ -69,7 +69,6 @@ class DevolusionPair:
 class OuroborosTMF:
     ENGINE_NAME="OUROBOROS_TMF"
     def __init__(self)->None:
-        self._prompt_refinements:list[str]=[]
         logger.info("[OUROBOROS] Co-evolution engine initialised")
     def run(
         self,
@@ -81,6 +80,7 @@ class OuroborosTMF:
         t0=time.perf_counter()
         logger.info("[OUROBOROS] Starting co-evolution (%d max cycles)",max_cycles)
         result=OuroborosResult()
+        prompt_refinements:list[str]=[]
         if not forecasts:
             logger.warning("[OUROBOROS] No forecasts — cannot run co-evolution")
             return result
@@ -91,7 +91,7 @@ class OuroborosTMF:
             predicted_technique=(
                 top_forecast.predicted_technique
                 if cycle_num==0
-                else self._get_refined_prediction(top_forecast,self._prompt_refinements)
+                else self._get_refined_prediction(top_forecast,prompt_refinements)
             )
             if ground_truth_technique:
                 actual_technique=ground_truth_technique
@@ -109,7 +109,7 @@ class OuroborosTMF:
                     actual=actual_technique,
                     mag=mag_staging,
                 )
-                self._prompt_refinements.append(refinement)
+                prompt_refinements.append(refinement)
                 result.prompt_refinements.append(refinement)
             devolution_pairs=self._generate_devolution_pairs_for_cycle(
                 mag_staging,actual_technique
@@ -211,11 +211,15 @@ class OuroborosTMF:
                 model=LLM_MODEL,
                 max_tokens=100,
                 messages=[{"role":"user","content":prompt}],
+                timeout=10.0,
             )
             import json
             text="".join(b.text for b in response.content if hasattr(b,"text"))
             parsed=json.loads(text.strip())
-            return parsed.get("technique",forecast.predicted_technique)
+            technique=parsed.get("technique",forecast.predicted_technique)
+            if not technique or not isinstance(technique,str) or not technique.startswith("T"):
+                return forecast.predicted_technique
+            return technique
         except Exception as exc:
             logger.debug("[OUROBOROS] Refined prediction LLM failed: %s",exc)
             return forecast.predicted_technique
@@ -243,6 +247,7 @@ class OuroborosTMF:
                 model=OUROBOROS_CRITIC_MODEL,
                 max_tokens=100,
                 messages=[{"role":"user","content":prompt}],
+                timeout=15.0,
             )
             text="".join(b.text for b in response.content if hasattr(b,"text"))
             parsed=json.loads(text.strip())
@@ -275,6 +280,7 @@ class OuroborosTMF:
                 model=LLM_MODEL,
                 max_tokens=150,
                 messages=[{"role":"user","content":prompt}],
+                timeout=10.0,
             )
             return "".join(b.text for b in response.content if hasattr(b,"text"))
         except Exception as exc:
