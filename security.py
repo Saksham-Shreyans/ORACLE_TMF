@@ -1,4 +1,4 @@
-﻿"""Shared security hardening helpers for ORACLE-TMF."""
+"""Shared security hardening helpers for ORACLE-TMF."""
 from __future__ import annotations
 import html
 import hmac
@@ -21,8 +21,8 @@ from config.settings import(
 )
 try:
     from defusedxml import ElementTree as SafeET
-except ImportError:
-    import xml.etree.ElementTree as SafeET
+except ImportError as exc:
+    raise RuntimeError("defusedxml is required for secure XML parsing") from exc
 CONTROL_CHARS_RE=re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]")
 SECRET_RE=re.compile(
     r"(?i)(sk-ant-[a-z0-9_-]+|sk-[a-z0-9_-]{16,}|api[_-]?key\s*[:=]\s*['\"]?[^'\"\s,}]+|"
@@ -60,7 +60,7 @@ def validate_apk_zip_names(names:Iterable[str])->None:
 async def read_upload_limited(upload:UploadFile,field_name:str,max_bytes:int=APK_MAX_SIZE_BYTES)->bytes:
     filename=upload.filename or ""
     if not filename.lower().endswith(".apk"):
-        raise HTTPException(status_code=400,detail=f"{field_name}must be an.apk file")
+        raise HTTPException(status_code=400,detail=f"{field_name} must be an .apk file")
     data=bytearray()
     while True:
         chunk=await upload.read(UPLOAD_READ_CHUNK_BYTES)
@@ -68,24 +68,24 @@ async def read_upload_limited(upload:UploadFile,field_name:str,max_bytes:int=APK
             break
         data.extend(chunk)
         if len(data)>max_bytes:
-            raise HTTPException(status_code=413,detail=f"{field_name}exceeds{max_bytes//1024//1024}MB limit")
+            raise HTTPException(status_code=413,detail=f"{field_name} exceeds {max_bytes//1024//1024}MB limit")
     if len(data)<APK_MIN_SIZE_BYTES:
-        raise HTTPException(status_code=400,detail=f"{field_name}is too small")
+        raise HTTPException(status_code=400,detail=f"{field_name} is too small")
     if bytes(data[:4])!=b"PK\x03\x04":
-        raise HTTPException(status_code=400,detail=f"{field_name}is not a ZIP/APK")
+        raise HTTPException(status_code=400,detail=f"{field_name} is not a ZIP/APK")
     import zipfile,io
     try:
         with zipfile.ZipFile(io.BytesIO(bytes(data)),"r")as zf:
             validate_apk_zip_names(zf.namelist())
     except ValueError as exc:
-        raise HTTPException(status_code=400,detail=f"{field_name}is not a valid APK:{exc}")from exc
+        raise HTTPException(status_code=400,detail=f"{field_name} is not a valid APK: {exc}")from exc
     except zipfile.BadZipFile as exc:
-        raise HTTPException(status_code=400,detail=f"{field_name}ZIP is corrupt")from exc
+        raise HTTPException(status_code=400,detail=f"{field_name} ZIP is corrupt")from exc
     return bytes(data)
 def require_api_key(provided_key:str|None)->str:
     expected=os.getenv(API_KEY_ENV,"")
     if not expected:
-        raise HTTPException(status_code=503,detail=f"API disabled until{API_KEY_ENV}is configured")
+        raise HTTPException(status_code=503,detail=f"API disabled until {API_KEY_ENV} is configured")
     if not provided_key or not hmac.compare_digest(provided_key,expected):
         raise HTTPException(status_code=401,detail="Invalid or missing API key")
     return provided_key
