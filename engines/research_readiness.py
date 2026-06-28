@@ -1,4 +1,4 @@
-﻿"""
+"""
 ORACLE-TMF research readiness engine.
 
 Converts Stage 1 MAG output and optional Stage 2 intelligence into a compact,
@@ -106,19 +106,20 @@ class ResearchReadinessEngine:
         skipped_lab.append("SYNTHETIC_VARIANT")
         notes:list[str]=[]
         nav=getattr(stage2_report,"nav_redirection","")or ""
-        cluster=int(getattr(stage2_report,"builder_cluster_id",-1)or-1)
+        cluster_raw=getattr(stage2_report,"builder_cluster_id",-1)
+        cluster=int(cluster_raw) if cluster_raw is not None and cluster_raw != "" else -1
         threat=getattr(stage2_report,"highest_ddos_threat","NONE")or "NONE"
         robustness=float(getattr(stage2_report,"robustness_score",0.0)or 0.0)
         if nav:
-            notes.append(f"NAV redirection observed:{nav}.")
+            notes.append(f"NAV redirection observed: {nav}.")
         if cluster!=-1:
-            notes.append(f"KINSHIP builder cluster:{cluster}.")
+            notes.append(f"KINSHIP builder cluster: `{cluster}`.")
         if robustness:
-            notes.append(f"MIRAGE robustness score:{robustness:.2f}.")
+            notes.append(f"MIRAGE robustness score: {robustness:.2f}.")
         if threat!="NONE":
-            notes.append(f"Network attack threat level:{threat}.")
+            notes.append(f"Network attack threat level: {threat}.")
         if confirmed:
-            notes.append(f"PHANTOM confirmed{len(confirmed)}behavior(s).")
+            notes.append(f"PHANTOM confirmed {len(confirmed)} behavior(s).")
         if not notes:
             notes.append("Stage 2 ran but produced low-signal aggregate findings.")
         safety_mode="LAB_DYNAMIC_OPT_IN" if confirmed else "SAFE_STATIC_DEFAULT"
@@ -252,16 +253,16 @@ class ResearchReadinessEngine:
         if forecasts:
             top=forecasts[0]
             return(
-                f"{family}contains convergent mutation artifacts forecasting "
-                f"{top.predicted_technique or 'a next-version capability'}"
-                f"with publication readiness{score:.2f}."
+                f"{family} contains convergent mutation artifacts forecasting "
+                f"{top.predicted_technique or 'a next-version capability'} "
+                f"with publication readiness {score:.2f}."
             )
         if stage2.available and stage2.highest_network_threat!="NONE":
             return(
-                f"{family}shows Stage 2 network-attack evidence with "
-                f"{stage2.highest_network_threat.lower()}operational risk."
+                f"{family} shows Stage 2 network-attack evidence with "
+                f"{stage2.highest_network_threat.lower()} operational risk."
             )
-        return f"{family}produced a reproducible mutation-artifact case study with readiness{score:.2f}."
+        return f"{family} produced a reproducible mutation-artifact case study with readiness {score:.2f}."
     def _evidence_matrix(self,mag:MutationArtifactGraph,counts:dict[str,int])->list[dict]:
         rows=[
             ("CLASS_1_DEAD_CODE","Dormant implementation code",counts["dead_code"],"Stage D + DTE"),
@@ -313,21 +314,21 @@ class ResearchReadinessEngine:
         findings:list[str]=[]
         if mag.total_artifact_count():
             active=sum(1 for row in self._artifact_counts(mag).values()if row)
-            findings.append(f"Detected{mag.total_artifact_count()}mutation artifacts across{active}active classes.")
+            findings.append(f"Detected {mag.total_artifact_count()} mutation artifacts across {active} active classes.")
         for forecast in mag.high_confidence_forecasts()[:2]:
             findings.append(
-                f"High-confidence forecast:{forecast.predicted_technique}"
-                f"({forecast.technique_name or 'unnamed technique'})at C={forecast.confidence_score:.3f}."
+                f"High-confidence forecast: {forecast.predicted_technique} "
+                f"({forecast.technique_name or 'unnamed technique'}) at C={forecast.confidence_score:.3f}."
             )
         if stage2.available:
             if stage2.nav_redirection:
-                findings.append(f"NAV evolutionary redirection:{stage2.nav_redirection}.")
+                findings.append(f"NAV evolutionary redirection: {stage2.nav_redirection}.")
             if stage2.builder_cluster_id!=-1:
-                findings.append(f"KINSHIP attributed the sample to builder cluster{stage2.builder_cluster_id}.")
+                findings.append(f"KINSHIP attributed the sample to builder cluster `{stage2.builder_cluster_id}`.")
             if stage2.highest_network_threat!="NONE":
-                findings.append(f"Network attack analyzer reports{stage2.highest_network_threat}threat level.")
+                findings.append(f"Network attack analyzer reports {stage2.highest_network_threat} threat level.")
             if stage2.suricata_rules_count:
-                findings.append(f"Generated{stage2.suricata_rules_count}network detection rule(s)for defenders.")
+                findings.append(f"Generated {stage2.suricata_rules_count} network detection rule(s) for defenders.")
         if not findings:
             findings.append("No strong mutation evidence was detected; retain as a negative-control sample.")
         return findings

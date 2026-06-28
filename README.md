@@ -1467,3 +1467,6 @@ The default work directory is:
 
 ---
 
+## Disclaimer
+
+ORACLE-TMF is a defensive security research tool. Use it only on samples and systems you are authorized to analyze. Dynamic detonation, Frida instrumentation, and synthetic-variant workflows must be confined to isolated malware-lab environments. The maintainers and users are responsible for complying with applicable law, organizational policy, and safe malware-handling practices.
