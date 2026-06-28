@@ -59,3 +59,39 @@ colorlog==6.9.0            # Coloured logging output
 
 # ── Testing ───────────────────────────────────────────────
 pytest>=8.0.0              # Unit testing framework
+# ============================================================
+# ORACLE-TMF Stage 2 — Additional Requirements
+# ============================================================
+# Extends requirements.txt (Stage 1).
+# Install after Stage 1 deps:
+#   pip install -r requirements.txt
+#   pip install -r requirements_stage2.txt
+#
+# Frida requires a separate installation step documented in
+# STAGE2_INTEGRATION.md (device-side server + Python bindings).
+# ============================================================
+
+# ── Dynamic Analysis (PHANTOM / Frida) ───────────────────────
+frida>=16.5.0                   # Dynamic instrumentation — device-side analysis only
+frida-tools>=12.4.0             # Frida CLI utilities
+
+# ── Clustering & Fingerprinting (KINSHIP) ────────────────────
+sentence-transformers>=3.3.1    # Already in Stage 1; listed here for clarity
+scikit-learn>=1.6.1             # Cosine similarity, clustering (Stage 1 dep)
+
+# ── Synthetic Variant Generation ─────────────────────────────
+# apktool is installed system-side:
+#   Linux:  sudo apt-get install apktool
+#   macOS:  brew install apktool
+# Python wrapper (optional):
+apkutils2>=1.0.0                # APK inspection utilities
+
+# ── Network Analysis ──────────────────────────────────────────
+# No additional deps — uses stdlib socket and re modules
+
+# ── Testing ───────────────────────────────────────────────────
+pytest>=8.0.0                   # Already in Stage 1
+pytest-cov>=6.0.0               # Coverage reporting for Stage 2 test suite
+
+# ── Utilities ────────────────────────────────────────────────
+python-dotenv>=1.0.0            # .env file loading for PHANTOM session config

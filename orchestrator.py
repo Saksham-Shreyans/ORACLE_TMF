@@ -2,12 +2,14 @@
 ORACLE-TMF  ·  orchestrator.py
 ================================
 Main Pipeline Orchestrator
-Sequences all 12 pipeline stages and 5 engine modules for a single APK
-analysis run.  Every stage is isolated: a failure in any stage is captured
-in MAG.stage_errors and the pipeline continues with safe defaults.
+Sequences all 12 pipeline stages, 5 engine modules, and the Stage 2 pipeline 
+for a single APK analysis run. Every stage is isolated: a failure in any stage 
+is captured in MAG.stage_errors and the pipeline continues with safe defaults.
 Pipeline execution order:
-  A → B → TMF-REFLECT → C → D → DTE → E → F → G → H
-  → GenAI → UI → Targeting → I (optional) → J → K → L
+  Stage 1: A → B → TMF-REFLECT → C → D → DTE → E → F → G → H
+           → GenAI → UI → Targeting → I (optional) → J → K → L
+  Stage 2: M (PHANTOM) → N (NAV) → O (CABAL) → P (KINSHIP) → Q (MIRAGE) 
+           → R (OUROBOROS) → Network Attack
 Isolation guarantee:
   Each stage call is wrapped in _run_stage().  This method:
     • Records wall-clock timing in MAG.stage_timings_ms
@@ -24,6 +26,7 @@ Usage
   result = orch.analyze("/path/to/malware.apk")
   print(result.mag.to_json())
   print(result.report_bundle.pdf_path)
+  print(result.stage2_report.to_dict() if result.stage2_report else None)
 """
 from __future__ import annotations
 import logging
@@ -52,6 +55,7 @@ from engines.tmf_reflect import TMFReflect
 from engines.genai_scaffold_detector import GenAIScaffoldDetector
 from engines.unfinished_ui_detector import UnfinishedUIDetector
 from engines.targeting_intelligence import TargetingIntelligence
+from orchestrator_stage2 import Stage2Orchestrator, Stage2Config, Stage2Report
 
 logging.basicConfig(format=LOG_FORMAT,level=getattr(logging,LOG_LEVEL,logging.INFO))
 
@@ -72,6 +76,7 @@ class AnalysisResult:
     """
     mag:MutationArtifactGraph
     report_bundle:Optional[ReportBundle]=None
+    stage2_report:Optional[Stage2Report]=None
     success:bool=True
     total_time_ms:float=0.0
     error:str=""
@@ -113,6 +118,7 @@ class ORACLETMFOrchestrator:
         self._genai=GenAIScaffoldDetector()
         self._ui_det=UnfinishedUIDetector()
         self._targeting=TargetingIntelligence()
+        self._stage2_orch=Stage2Orchestrator()
         logger.info("[Orchestrator] All components initialised — ready to analyse")
     
     
@@ -124,6 +130,7 @@ class ORACLETMFOrchestrator:
         progress_callback:Optional[Callable]=None,
         skip_llm:bool=False,
         skip_report:bool=False,
+        stage2_config:Optional[Stage2Config]=None,
     )->AnalysisResult:
         """
         Run the full ORACLE-TMF 12-stage pipeline on an APK.
@@ -138,6 +145,8 @@ class ORACLETMFOrchestrator:
                                    Useful for fast static-only analysis.
         skip_report       : bool — skip Stage L (no file output).
                                    Useful for programmatic/test use.
+        stage2_config     : Stage2Config — config for Stage 2. If None, uses defaults.
+
         Returns
         -------
         AnalysisResult
@@ -301,6 +310,19 @@ class ORACLETMFOrchestrator:
                 
                 self._apply_targeting_to_forecasts(mag,targeting)
             
+            self._progress(progress_callback,"STAGE_2",0.92)
+            stage2_report = None
+            if stage2_config is not None:
+                self._stage2_orch.config = stage2_config
+                
+                prev_mag = self._build_static_mag(prev_apk_path) if prev_apk_path and os.path.isfile(prev_apk_path) else None
+                
+                stage2_report = self._run_stage(
+                    "STAGE_2", mag,
+                    lambda: self._stage2_orch.run(mag, forecasts=mag.forecasts, mag_prev=prev_mag, apk_path=apk_path),
+                    default=None
+                )
+            
             report_bundle=None
             if not skip_report:
                 self._progress(progress_callback,"STAGE_L",0.95)
@@ -323,6 +345,7 @@ class ORACLETMFOrchestrator:
             return AnalysisResult(
                 mag=mag,
                 report_bundle=report_bundle,
+                stage2_report=stage2_report,
                 success=True,
                 total_time_ms=total_ms,
             )
@@ -332,6 +355,7 @@ class ORACLETMFOrchestrator:
             return AnalysisResult(
                 mag=mag,
                 report_bundle=None,
+                stage2_report=None,
                 success=False,
                 total_time_ms=total_ms,
                 error=str(exc),

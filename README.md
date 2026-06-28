@@ -19,6 +19,16 @@ ORACLE-TMF employs a 12-stage pipeline to dissect Android applications and extra
 ### 🧠 LLM Multi-Agent Reasoning
 The LLM Reasoning Engine analyzes the gathered artifacts to produce chain-of-thought rationales about the malware's evolution, pinpointing techniques, tactics, and targeted institutions/geographies.
 
+### 🧬 Stage 2 Intelligence Engines
+ORACLE-TMF now includes advanced Stage 2 components for deeper analysis:
+- **NAV (Negative Artifact Vectors)**: Analyzes dropped or removed artifacts to identify tactical shifts or evasion strategies.
+- **KINSHIP**: Fingerprints the builder DNA to cluster malware samples by their origin.
+- **MIRAGE**: Scores the robustness of the pipeline and evaluates injection costs.
+- **CABAL (opt-in)**: Detects multi-APK collusion and constructs cross-app artifact bridge graphs.
+- **PHANTOM (lab only)**: An active deception engine simulating an Android environment to defeat anti-analysis checks.
+- **Network Attack Analyzer**: Detects DDoS, DGA, and other network threats, generating Suricata rules and STIX indicators.
+- **OUROBOROS (research)**: A co-evolutionary loop for training and forecasting refinement.
+
 ### 🎯 Evolutionary Mutation Forecasts
 - **Evolutionary Timeline**: Visualizes the historical (v_n-1), current (v_n), and predicted next version (v_n+1) of the malware.
 - **Bayesian Confidence Scoring**: Computes a confidence score for each prediction based on LLM probability, artifact density, and prior probabilities, filtering out low-confidence guesses.

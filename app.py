@@ -74,6 +74,7 @@ except ImportError:
     _PLOTLY_OK=False
 try:
     from orchestrator import ORACLETMFOrchestrator,AnalysisResult
+    from orchestrator_stage2 import Stage2Config
     _ORCH_OK=True
 except ImportError:
     _ORCH_OK=False
@@ -87,7 +88,7 @@ def get_orchestrator():
         return None
     return ORACLETMFOrchestrator()
 @st.cache_data(show_spinner=False,max_entries=10)
-def run_analysis_cached(apk_bytes:bytes,prev_bytes:bytes|None,skip_llm:bool):
+def run_analysis_cached(apk_bytes:bytes,prev_bytes:bytes|None,skip_llm:bool,stage2_config_dict:dict):
     """
     Run the pipeline and cache the result by APK content hash.
     Returns (AnalysisResult, error_str).
@@ -105,11 +106,13 @@ def run_analysis_cached(apk_bytes:bytes,prev_bytes:bytes|None,skip_llm:bool):
             with open(prev_path,"wb")as fh:
                 fh.write(prev_bytes)
         try:
+            stage2_config = Stage2Config(**stage2_config_dict)
             result=orch.analyze(
                 apk_path,
                 prev_apk_path=prev_path,
                 skip_llm=skip_llm,
                 skip_report=False,
+                stage2_config=stage2_config
             )
             return result,""
         except Exception as exc:
@@ -118,7 +121,7 @@ def run_analysis_cached(apk_bytes:bytes,prev_bytes:bytes|None,skip_llm:bool):
 
 
 def render_sidebar()->tuple:
-    """Render the sidebar and return (uploaded_apk, prev_apk, deobf, skip_llm, run_pressed)."""
+    """Render the sidebar and return inputs and config."""
     with st.sidebar:
         st.markdown("## 🔮 ORACLE-TMF")
         st.markdown(
@@ -150,6 +153,25 @@ def render_sidebar()->tuple:
             help="Run stages A-H only. Much faster, no API costs, no forecasts.",
         )
         st.divider()
+        st.markdown("### ⚙️ Stage 2 Configuration")
+        stage2_nav = st.checkbox("Stage N: NAV Analysis", value=True, help="Adjust Stage K confidence")
+        stage2_kinship = st.checkbox("Stage P: KINSHIP Fingerprinting", value=True, help="Builder DNA")
+        stage2_mirage = st.checkbox("Stage Q: MIRAGE Robustness", value=True, help="Pipeline robustness scoring")
+        stage2_network = st.checkbox("Network Attack Analysis", value=True, help="DDoS/ANC signature detection")
+        stage2_cabal = st.checkbox("Stage O: CABAL Collusion", value=False, help="Requires >= 2 APKs in mag_list")
+        stage2_phantom = st.checkbox("Stage M: PHANTOM Detonation", value=False, help="Requires air-gapped lab + rooted device")
+        stage2_ouroboros = st.checkbox("Stage R: OUROBOROS", value=False, help="Research/training mode only")
+        stage2_config_dict = {
+            "nav_enabled": stage2_nav,
+            "kinship_enabled": stage2_kinship,
+            "mirage_enabled": stage2_mirage,
+            "network_attack_enabled": stage2_network,
+            "cabal_enabled": stage2_cabal,
+            "phantom_enabled": stage2_phantom,
+            "ouroboros_enabled": stage2_ouroboros,
+            "save_json_reports": False
+        }
+        st.divider()
         run_btn=st.button(
             "🔍  ANALYZE APK",
             type="primary",
@@ -163,7 +185,7 @@ def render_sidebar()->tuple:
             ">",
             unsafe_allow_html=True,
         )
-    return uploaded,prev_uploaded,deobf,skip_llm,run_btn
+    return uploaded,prev_uploaded,deobf,skip_llm,run_btn,stage2_config_dict
 
 
 
@@ -185,6 +207,21 @@ def render_overview(result):
         st.metric("Min SDK",str(m.min_sdk)if m.min_sdk else "—")
         st.metric("Target SDK",str(m.target_sdk)if m.target_sdk else "—")
         st.metric("Analysis Time",f"{result.total_time_ms/1000:.1f} s")
+    
+    if getattr(result, "stage2_report", None) is not None:
+        st.divider()
+        st.markdown("### 🧬 Stage 2 Intelligence Products")
+        s2 = result.stage2_report
+        c1, c2, c3, c4 = st.columns(4)
+        with c1:
+            st.metric("NAV Redirection", s2.nav_redirection or "—")
+        with c2:
+            st.metric("MIRAGE Robustness", f"{s2.robustness_score:.2f}")
+        with c3:
+            st.metric("Highest DDoS Threat", s2.highest_ddos_threat)
+        with c4:
+            st.metric("Builder Cluster ID", str(s2.builder_cluster_id) if s2.builder_cluster_id != -1 else "—")
+            
     st.divider()
     
     st.markdown("### 🔬 Mutation Artifact Inventory — 7-Class Taxonomy")
@@ -632,7 +669,7 @@ def main()->None:
         unsafe_allow_html=True,
     )
     
-    uploaded,prev_uploaded,deobf,skip_llm,run_btn=render_sidebar()
+    uploaded,prev_uploaded,deobf,skip_llm,run_btn,stage2_config_dict=render_sidebar()
     
     if "analysis_result"not in st.session_state:
         st.session_state.analysis_result=None
@@ -642,8 +679,8 @@ def main()->None:
     if run_btn and uploaded:
         apk_bytes=uploaded.read()
         prev_bytes=prev_uploaded.read()if prev_uploaded else None
-        with st.spinner(f"⚙️ Running ORACLE-TMF 12-stage pipeline…  (deobf={deobf})"):
-            result,err=run_analysis_cached(apk_bytes,prev_bytes,skip_llm)
+        with st.spinner(f"⚙️ Running ORACLE-TMF pipeline with Stage 2…"):
+            result,err=run_analysis_cached(apk_bytes,prev_bytes,skip_llm,stage2_config_dict)
         st.session_state.analysis_result=result
         st.session_state.analysis_error=err
         if err:
