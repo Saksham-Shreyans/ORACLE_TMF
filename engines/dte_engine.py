@@ -1,9 +1,8 @@
-﻿"""
+"""
 ORACLE-TMF  Â·  engines/dte_engine.py
 ======================================
 DORMANCY TAXONOMY ENGINE (DTE)
 The DTE is a 4-class XGBoost classifier that resolves a critical ambiguity:
-    pass
 Not all statically unreachable code is a mutation artifact. A huge fraction
 of dead code in real-world APKs is benign SDK boilerplate left behind by
 third-party library inclusion (Firebase, Google Play Services, etc.).
@@ -203,7 +202,6 @@ class DTEEngine:
         """
         Generate synthetic training data for the DTE classifier.
         Feature distributions are derived from domain knowledge:
-            pass
         REMNANT (0) â€” SDK boilerplate:
           â€¢ trigger_depth:   0-1  (no complex guards)
           â€¢ guard_entropy:   0.0-1.5 (low complexity)
