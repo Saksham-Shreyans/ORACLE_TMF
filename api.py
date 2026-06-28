@@ -1,4 +1,4 @@
-﻿"""
+"""
 ORACLE-TMF API layer with production-safe defaults.
 
 The API is disabled until ORACLE_TMF_API_KEY is configured. Results are
@@ -60,8 +60,13 @@ _rate_limiter=SlidingWindowRateLimiter(API_RATE_LIMIT_REQUESTS,API_RATE_LIMIT_WI
 @app.middleware("http")
 async def security_headers_and_size_guard(request:Request,call_next):
     content_length=request.headers.get("content-length")
-    if content_length and int(content_length)>(APK_MAX_SIZE_BYTES*2+1024*1024):
-        raise HTTPException(status_code=413,detail="Request body too large")
+    if content_length:
+        try:
+            length_val = int(content_length)
+            if length_val > (APK_MAX_SIZE_BYTES * 2 + 1024 * 1024):
+                raise HTTPException(status_code=413,detail="Request body too large")
+        except ValueError:
+            raise HTTPException(status_code=400,detail="Invalid Content-Length header")
     response=await call_next(request)
     response.headers["X-Content-Type-Options"]="nosniff"
     response.headers["X-Frame-Options"]="DENY"
