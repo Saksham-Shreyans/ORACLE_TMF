@@ -1,2 +1,2 @@
-from.nav_engine import NAVEngine
+from .nav_engine import NAVEngine
 __all__=["NAVEngine"]
