@@ -161,10 +161,10 @@ class NAVEngine:
         redirection=self._REDIRECT_MAP.get(artifact_class,NAVRedirectionHypothesis.UNKNOWN)
         nav_score=min(1.0,delta/max(count_before,1))
         evidence=[
-            f"{artifact_class}count dropped from{count_before}to{count_after}"
-            f"between{version_from}and{version_to}.",
-            f"Delta:{delta}artifacts lost(NAV score:{nav_score:.3f}).",
-            f"Implied redirection:{redirection.value}.",
+            f"{artifact_class} count dropped from {count_before} to {count_after} "
+            f"between {version_from} and {version_to}.",
+            f"Delta: {delta} artifacts lost (NAV score: {nav_score:.3f}).",
+            f"Implied redirection: {redirection.value}.",
         ]
         return NAVEvent(
             artifact_class=artifact_class,
@@ -196,11 +196,11 @@ class NAVEngine:
             if velocity>=NAV_MIRAGE_VELOCITY_THRESHOLD:
                 event.mirage_confidence=round(min(1.0,velocity),4)
                 event.supporting_evidence.append(
-                    f"NAV-MIRAGE:artifact appeared in "
-                    f"{history.first_appearance_version}and vanished in "
-                    f"{history.first_disappearance_version}— "
-                    f"velocity={velocity:.3f}≥{NAV_MIRAGE_VELOCITY_THRESHOLD}."
-                    "Possible adversarial artifact injection."
+                    f"NAV-MIRAGE: artifact appeared in "
+                    f"{history.first_appearance_version} and vanished in "
+                    f"{history.first_disappearance_version} — "
+                    f"velocity={velocity:.3f} ≥ {NAV_MIRAGE_VELOCITY_THRESHOLD}."
+                    " Possible adversarial artifact injection."
                 )
                 suspects.append(event)
                 logger.warning(
